@@ -1,0 +1,1437 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>怪物图鉴</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* ========== 主题变量 ========== */
+        :root {
+            /* 暗色主题（深色系） */
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: linear-gradient(145deg, #1e293b, #0f172a);
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --accent: #60a5fa;
+            --accent-dark: #3b82f6;
+            --border: rgba(96, 165, 250, 0.5);
+            --input-bg: rgba(30, 41, 59, 0.8);
+            --shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            --btn-gradient: linear-gradient(135deg, #3b82f6, #60a5fa);
+            --badge-bg: #2563eb;
+            --badge-text: #ffffff;
+            --card-bg: rgba(30, 41, 59, 0.6);
+            --hover-bg: rgba(96, 165, 250, 0.2);
+        }
+
+        [data-theme="light"] {
+            /* 日间模式（浅色系） */
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --accent: #2c6e4a;
+            --accent-dark: #1e5a3a;
+            --border: rgba(44, 110, 74, 0.3);
+            --input-bg: #ffffff;
+            --shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+            --btn-gradient: linear-gradient(135deg, #e8f0e2, #d4e0ca);
+            --badge-bg: #2c6e4a;
+            --badge-text: #ffffff;
+            --card-bg: #ffffff;
+            --hover-bg: rgba(44, 110, 74, 0.1);
+        }
+
+        body {
+            background: var(--bg-primary);
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            padding: 2rem;
+            position: relative;
+            transition: background 0.3s ease;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(2px);
+            border-radius: 2rem;
+            padding: 0 0.5rem;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+        }
+
+        /* 头部控制栏 */
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            padding: 0.6rem 1.2rem;
+            border-radius: 2rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .left-tools {
+            display: flex;
+            gap: 0.6rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .mode-switch {
+            display: flex;
+            gap: 0.3rem;
+            background: rgba(0, 0, 0, 0.1);
+            padding: 0.2rem;
+            border-radius: 2rem;
+        }
+
+        .mode-btn {
+            padding: 0.4rem 1.2rem;
+            border: none;
+            border-radius: 2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.85rem;
+            background: transparent;
+            color: var(--accent);
+        }
+
+        .mode-btn.active {
+            background: var(--btn-gradient);
+            color: var(--badge-text);
+            box-shadow: 0 2px 8px var(--accent)80;
+        }
+
+        .action-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 0.4rem 1rem;
+            border-radius: 2rem;
+            color: var(--text-primary);
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: 0.1s;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        .action-btn:hover {
+            transform: translateY(-2px);
+            background: var(--hover-bg);
+            box-shadow: 0 4px 10px var(--accent)40;
+        }
+        .danger-btn {
+            border-color: #e67e5a;
+            color: #e67e5a;
+        }
+        .danger-btn:hover {
+            background: rgba(230, 126, 90, 0.1);
+        }
+
+        .import-area {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            background: var(--card-bg);
+            padding: 0.2rem 0.8rem;
+            border-radius: 2rem;
+            border: 1px solid var(--border);
+        }
+        .file-info {
+            font-size: 0.7rem;
+            color: var(--accent);
+        }
+
+        .mode-hint {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            background: var(--card-bg);
+            padding: 0.2rem 0.8rem;
+            border-radius: 2rem;
+            border: 1px solid var(--border);
+        }
+
+        /* 主题切换按钮 */
+        .theme-toggle {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 2rem;
+            padding: 0.4rem 1rem;
+            cursor: pointer;
+            color: var(--accent);
+            font-weight: 500;
+            transition: 0.1s;
+        }
+        .theme-toggle:hover {
+            background: var(--hover-bg);
+        }
+
+        /* 标题 - 骷髅样式 */
+        .header {
+            margin-bottom: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+        .header h1 {
+            font-size: 2.2rem;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 800;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            letter-spacing: 2px;
+        }
+        .header h1::before {
+            content: "💀";
+            font-size: 2rem;
+            margin-right: 0.5rem;
+            background: none;
+            -webkit-background-clip: unset;
+            background-clip: unset;
+            color: var(--accent);
+            display: inline-block;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+        }
+        .header::after {
+            content: "";
+            display: block;
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            margin: 0.5rem auto 0;
+        }
+
+        /* 搜索排序栏 */
+        .search-sort-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.8rem;
+            background: var(--card-bg);
+            backdrop-filter: blur(8px);
+            padding: 0.6rem 1rem;
+            border-radius: 2rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--input-bg);
+            padding: 0.2rem 0.8rem;
+            border-radius: 2rem;
+            flex: 2;
+            min-width: 180px;
+            border: 1px solid var(--border);
+        }
+        .search-box input {
+            border: none;
+            padding: 0.4rem 0;
+            font-size: 0.85rem;
+            width: 100%;
+            outline: none;
+            background: transparent;
+            color: var(--text-primary);
+        }
+        .search-box input::placeholder {
+            color: var(--text-secondary);
+        }
+        .search-box button {
+            background: none;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            color: var(--accent);
+        }
+        .sort-group {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: var(--input-bg);
+            padding: 0.2rem 0.8rem;
+            border-radius: 2rem;
+        }
+        .sort-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        .sort-btn {
+            background: transparent;
+            border: none;
+            padding: 0.3rem 0.6rem;
+            border-radius: 1.2rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: 0.1s;
+        }
+        .sort-btn.active {
+            background: var(--btn-gradient);
+            color: var(--badge-text);
+            font-weight: bold;
+        }
+
+        /* 分类汇总栏 */
+        .summary-bar {
+            display: flex;
+            gap: 0.8rem;
+            background: var(--card-bg);
+            backdrop-filter: blur(8px);
+            padding: 0.4rem 1rem;
+            border-radius: 2rem;
+            margin-bottom: 1.8rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            border: 1px solid var(--border);
+        }
+        .summary-card {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.3rem 1rem;
+            border-radius: 2rem;
+            cursor: pointer;
+            background: var(--input-bg);
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+        }
+        .summary-card:hover {
+            transform: translateY(-2px);
+            background: var(--hover-bg);
+        }
+        .summary-card.active {
+            background: var(--btn-gradient);
+            border-color: var(--accent);
+            box-shadow: 0 2px 8px var(--accent)40;
+        }
+        .summary-label {
+            font-weight: 500;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+        .summary-count {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--text-primary);
+            background: rgba(0, 0, 0, 0.1);
+            padding: 0 0.4rem;
+            border-radius: 1rem;
+            min-width: 1.5rem;
+            text-align: center;
+        }
+
+        /* 怪物网格卡片 */
+        .monster-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(170px, 200px));
+            gap: 1.5rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+        .monster-card {
+            background: var(--bg-card);
+            border-radius: 1.2rem;
+            padding: 0.8rem;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            text-align: center;
+            position: relative;
+        }
+        .monster-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+            border-color: var(--accent);
+        }
+        .monster-checkbox {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--accent);
+            z-index: 2;
+        }
+        .modify-badge, .rank-badge {
+            position: absolute;
+            top: 8px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            white-space: nowrap;
+            backdrop-filter: blur(2px);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        .modify-badge {
+            left: 34px;
+            background: var(--accent);
+            color: var(--badge-text);
+        }
+        .modify-badge.no-change { background: #4a7a5a; }
+        .modify-badge.changed { background: #c86a4a; }
+        .rank-badge {
+            right: 8px;
+            background: rgba(0, 0, 0, 0.6);
+            color: var(--accent);
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+            border: 1px solid var(--accent);
+        }
+        .rank-badge.minion { background: #2a5a2a; color: white; }
+        .rank-badge.elite { background: #b87a2a; color: white; }
+        .rank-badge.boss { background: #b84a2a; color: white; }
+
+        .monster-image {
+            width: 100%;
+            aspect-ratio: 1/1;
+            background: radial-gradient(circle at 30% 30%, #2a2a2a, #1a1a1a);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.8rem;
+            font-weight: bold;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            overflow: hidden;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+        }
+        .monster-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .monster-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            background: rgba(0, 0, 0, 0.3);
+            display: inline-block;
+            padding: 0.2rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            backdrop-filter: blur(4px);
+            border: 1px solid var(--border);
+        }
+
+        /* 内嵌详情面板 */
+        .detail-expanded {
+            grid-column: 1 / -1;
+            background: var(--bg-secondary);
+            backdrop-filter: blur(12px);
+            border-radius: 1.5rem;
+            padding: 1rem 1.2rem;
+            margin: 0.5rem 0;
+            border: 1px solid var(--accent);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px) scaleY(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scaleY(1);
+            }
+        }
+        .detail-expanded .detail-header {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.8rem;
+            flex-wrap: wrap;
+        }
+        .detail-expanded .detail-avatar {
+            width: 70px;
+            height: 70px;
+            background: radial-gradient(circle at 30% 30%, #3a3a3a, #2a2a2a);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--accent);
+        }
+        .detail-expanded .detail-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .detail-expanded .detail-avatar span {
+            font-size: 2.2rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+        .detail-expanded .detail-title h2 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.2rem;
+        }
+        .detail-expanded .detail-meta {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+        .detail-expanded .stats-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            margin-bottom: 0.8rem;
+        }
+        .detail-expanded .stat-card {
+            flex: 1;
+            min-width: 85px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 0.8rem;
+            padding: 0.4rem 0.2rem;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .detail-expanded .stat-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+        }
+        .detail-expanded .stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .detail-expanded .test-section h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            border-left: 3px solid var(--accent);
+            padding-left: 0.5rem;
+        }
+        .detail-expanded .test-items {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .detail-expanded .test-row {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            background: rgba(0, 0, 0, 0.03);
+            padding: 0.4rem 0.6rem;
+            border-radius: 0.8rem;
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+        .detail-expanded .test-label {
+            width: 55px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+        }
+        .detail-expanded .button-select-group {
+            flex: 1;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .detail-expanded .action-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 0.2rem 0.7rem;
+            border-radius: 1.2rem;
+            font-size: 0.7rem;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+        .detail-expanded .status-select {
+            border-radius: 1.2rem;
+            padding: 0.2rem 0.5rem;
+            font-size: 0.7rem;
+            min-width: 85px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .detail-expanded .button-bar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.6rem;
+            margin-top: 0.8rem;
+        }
+        .detail-expanded .save-btn, .detail-expanded .edit-btn, .detail-expanded .close-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--accent);
+            padding: 0.3rem 1rem;
+            border-radius: 1.5rem;
+            color: var(--text-primary);
+            font-size: 0.7rem;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        .detail-expanded .edit-btn {
+            background: var(--btn-gradient);
+            color: var(--badge-text);
+            border: none;
+        }
+        .detail-expanded .close-btn {
+            background: var(--card-bg);
+        }
+        .detail-expanded .info-note {
+            margin-top: 0.5rem;
+            font-size: 0.6rem;
+            text-align: right;
+            color: var(--text-secondary);
+        }
+        .modify-tag-detail {
+            display: inline-block;
+            margin-left: 0.4rem;
+            font-size: 0.65rem;
+            padding: 0.1rem 0.5rem;
+            border-radius: 20px;
+            background: var(--accent);
+            color: var(--badge-text);
+            vertical-align: middle;
+        }
+        .modify-tag-detail.no-change {
+            background: #4a7a5a;
+        }
+
+        /* 备注区域样式 */
+        .note-section {
+            margin-top: 0.8rem;
+            border-top: 1px solid var(--border);
+            padding-top: 0.6rem;
+        }
+        .note-section h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.4rem;
+            border-left: 3px solid var(--accent);
+            padding-left: 0.5rem;
+        }
+        .note-textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 0.8rem;
+            border: 1px solid var(--border);
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 0.8rem;
+            resize: vertical;
+            font-family: inherit;
+        }
+        .note-textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent)40;
+        }
+        .note-save-btn {
+            margin-top: 0.4rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 0.2rem 0.8rem;
+            border-radius: 1.2rem;
+            font-size: 0.7rem;
+            cursor: pointer;
+            color: var(--text-primary);
+            transition: 0.1s;
+        }
+        .note-save-btn:hover {
+            background: var(--hover-bg);
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 1200;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: var(--bg-secondary);
+            border-radius: 2rem;
+            padding: 2rem;
+            max-width: 550px;
+            width: 90%;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--accent);
+            color: var(--text-primary);
+        }
+        .modal-content h3 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--accent);
+            text-align: center;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--border);
+            display: inline-block;
+            width: 100%;
+            padding-bottom: 0.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 0.6rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 8px var(--accent)80;
+        }
+        .form-group input[type="file"] {
+            padding: 0.4rem;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 1.5rem;
+        }
+        .modal-buttons button {
+            padding: 0.6rem 1.5rem;
+            border-radius: 2rem;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.1s;
+        }
+        .cancel-modal {
+            background: rgba(100, 100, 100, 0.2);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .confirm-modal {
+            background: var(--btn-gradient);
+            color: var(--badge-text);
+        }
+        .confirm-modal:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px var(--accent)80;
+        }
+
+        .custom-toast {
+            animation: fadeUp 0.2s ease;
+            background: var(--bg-secondary);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--accent);
+            color: var(--text-primary);
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @media (max-width: 700px) {
+            body { padding: 1rem; }
+            .detail-expanded .stats-grid { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header-controls">
+        <div class="left-tools">
+            <div class="mode-switch">
+                <button class="mode-btn active" data-mode="solo">🎮 单人</button>
+                <button class="mode-btn" data-mode="multi">👥 多人</button>
+            </div>
+            <button class="action-btn" id="addMonsterBtn">➕ 添加</button>
+            <button class="action-btn danger-btn" id="deleteSelectedBtn">🗑️ 删除</button>
+            <button class="action-btn" id="manualSaveBtn">💾 保存</button>
+        </div>
+        <div class="import-area">
+            <input type="file" id="fileUpload" accept=".xlsx, .xls, .csv" style="display: none;">
+            <button class="action-btn" id="importBtn">📂 导入</button>
+            <span class="file-info" id="fileInfo"></span>
+        </div>
+        <button class="theme-toggle" id="themeToggle">☀️ 日间模式</button>
+        <div class="mode-hint" id="modeHint">单人: 小怪攻-10% / 精英攻-10% 血-25% 韧-20% / boss韧-20%</div>
+    </div>
+
+    <div class="header">
+        <h1>怪物图鉴</h1>
+    </div>
+
+    <div class="search-sort-bar">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 搜索怪物名或类型...">
+            <button id="clearSearchBtn">✖</button>
+        </div>
+        <div class="sort-group">
+            <span class="sort-label">排序:</span>
+            <button class="sort-btn" data-sort="id">ID</button>
+            <button class="sort-btn" data-sort="name">名称</button>
+            <button class="sort-btn" data-sort="type">类型</button>
+            <button class="sort-btn" data-sort="rank">标签</button>
+        </div>
+    </div>
+
+    <div class="summary-bar" id="summaryBar">
+        <div class="summary-card" data-filter="all"><span>📋</span><span class="summary-label">全部</span><span class="summary-count" id="countAll">0</span></div>
+        <div class="summary-card" data-filter="nochange"><span>✅</span><span class="summary-label">无改动</span><span class="summary-count" id="countNoChange">0</span></div>
+        <div class="summary-card" data-filter="changed"><span>🔄</span><span class="summary-label">改动</span><span class="summary-count" id="countChanged">0</span></div>
+    </div>
+
+    <div class="monster-grid" id="monsterGrid"></div>
+</div>
+
+<!-- 添加怪物模态框 -->
+<div id="addModal" class="modal">
+    <div class="modal-content">
+        <h3>➕ 收录新怪物</h3>
+        <form id="addForm">
+            <div class="form-group"><label>⚜️ 怪物ID *</label><input type="number" id="newId" required placeholder="唯一数字编号"></div>
+            <div class="form-group"><label>📜 怪物名称 *</label><input type="text" id="newName" required placeholder="如：焰爪魔"></div>
+            <div class="form-group"><label>🏷️ 怪物标签</label><select id="newRank"><option value="小怪">小怪</option><option value="精英">精英</option><option value="BOSS">BOSS</option></select></div>
+            <div class="form-group"><label>🧬 怪物类型</label><input type="text" id="newType" placeholder="骷髅 / 受刑者 / 幽灵 / 哥布林 / 杂物 / 海螺族"></div>
+            <div class="form-group"><label>❤️ 生命值</label><input type="number" id="newHp" value="100"></div>
+            <div class="form-group"><label>⚔️ 攻击力</label><input type="number" id="newAtk" value="100"></div>
+            <div class="form-group"><label>🛡️ 韧性值</label><input type="number" id="newArmor" value="100"></div>
+            <div class="form-group"><label><input type="checkbox" id="newIsChanged"> 🔄 是新增/改动怪物</label></div>
+            <div class="form-group"><label>🖼️ 怪物图片</label><input type="file" id="newImage" accept="image/*"></div>
+            <div class="modal-buttons">
+                <button type="button" id="cancelAddBtn" class="cancel-modal">取消</button>
+                <button type="submit" class="confirm-modal">确认收录</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑怪物模态框 -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3>✏️ 编辑怪物</h3>
+        <form id="editForm">
+            <input type="hidden" id="editId">
+            <div class="form-group"><label>📜 怪物名称</label><input type="text" id="editName" required></div>
+            <div class="form-group"><label>🧬 怪物类型</label><input type="text" id="editType" placeholder="骷髅 / 受刑者 / 幽灵 / 哥布林 / 杂物 / 海螺族"></div>
+            <div class="form-group"><label>🏷️ 怪物标签</label><select id="editRank"><option value="minion">小怪</option><option value="elite">精英</option><option value="boss">BOSS</option></select></div>
+            <div class="form-group"><label>❤️ 生命值</label><input type="number" id="editHp" value="100"></div>
+            <div class="form-group"><label>⚔️ 攻击力</label><input type="number" id="editAtk" value="100"></div>
+            <div class="form-group"><label>🛡️ 韧性值</label><input type="number" id="editArmor" value="100"></div>
+            <div class="form-group"><label><input type="checkbox" id="editIsChanged"> 🔄 是新增/改动怪物</label></div>
+            <div class="form-group"><label>🖼️ 怪物图片</label><input type="file" id="editImage" accept="image/*"></div>
+            <div class="modal-buttons">
+                <button type="button" id="cancelEditBtn" class="cancel-modal">取消</button>
+                <button type="submit" class="confirm-modal">保存修改</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // ======================== 全局数据 ========================
+    let monstersBase = [];
+    let monsterTestStates = {};
+    let monsterNotes = {};      // 存储备注
+    let currentFilter = "all";
+    let currentMode = "solo";
+    let currentSort = "id";
+    let searchKeyword = "";
+    let selectedIds = new Set();
+    let currentExpandedCard = null;
+    let currentExpandedId = null;
+
+    const testCategories = [
+        { key: "model", label: "模型" }, { key: "collision", label: "碰撞" },
+        { key: "effect", label: "特效" }, { key: "sound", label: "音效" },
+        { key: "action", label: "动作" }, { key: "behavior", label: "行为" }
+    ];
+    const statusOptions = [
+        { value: "", label: "空" }, { value: "Pass", label: "Pass" },
+        { value: "Defective", label: "Defective" }, { value: "Fail", label: "Fail" },
+        { value: "Untestable", label: "Untestable" }
+    ];
+    const rankTextMap = { "minion": "小怪", "elite": "精英", "boss": "BOSS" };
+    
+    function parseRank(value) {
+        if (!value) return "minion";
+        const str = String(value).trim();
+        if (str === "小怪") return "minion";
+        if (str === "精英") return "elite";
+        if (str === "BOSS" || str === "boss") return "boss";
+        if (str === "1") return "minion";
+        if (str === "2") return "elite";
+        if (str === "3") return "boss";
+        return "minion";
+    }
+    function parseType(value) {
+        if (!value) return "未知";
+        const str = String(value).trim();
+        if (["骷髅","受刑者","幽灵","哥布林","杂物","海螺族"].includes(str)) return str;
+        const map = { "1":"骷髅","2":"受刑者","3":"幽灵","4":"哥布林","5":"杂物","6":"海螺族" };
+        return map[str] || str;
+    }
+    function parseArmor(v) { let n = parseFloat(v); return isNaN(n) ? 100 : n; }
+
+    function getDynamicStats(monster) {
+        let hp = monster.baseHp, atk = monster.baseAtk, armor = monster.baseArmor;
+        const rank = monster.rank;
+        if (currentMode === "solo") {
+            if (rank === "minion") atk = Math.floor(monster.baseAtk * 0.9);
+            if (rank === "elite") { atk = Math.floor(monster.baseAtk * 0.9); hp = Math.floor(monster.baseHp * 0.75); armor = Math.floor(monster.baseArmor * 0.8); }
+            if (rank === "boss") armor = Math.floor(monster.baseArmor * 0.8);
+        } else if (currentMode === "multi" && rank === "elite") {
+            armor = Math.floor(monster.baseArmor * 1.33);
+        }
+        return { hp: Math.max(0, hp), atk: Math.max(0, atk), armor: Math.max(0, armor) };
+    }
+    function getRankText(r) { return rankTextMap[r]; }
+
+    const STORAGE_KEY = 'monsterBookData_v2';
+    function saveAllData() {
+        const dataToSave = {
+            monsters: monstersBase,
+            testStates: monsterTestStates,
+            notes: monsterNotes,
+            version: 3
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+        showToast("✨ 数据已保存", "#3c7a5a");
+    }
+    function loadAllData() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return false;
+        try {
+            const p = JSON.parse(saved);
+            if (p.monsters) {
+                monstersBase = p.monsters;
+                monsterTestStates = p.testStates || {};
+                monsterNotes = p.notes || {};
+                for (let m of monstersBase) {
+                    if (!monsterTestStates[m.id]) monsterTestStates[m.id] = {};
+                    for (let t of testCategories) if (monsterTestStates[m.id][t.key] === undefined) monsterTestStates[m.id][t.key] = "";
+                    if (monsterNotes[m.id] === undefined) monsterNotes[m.id] = "";
+                }
+                return true;
+            }
+        } catch(e) {}
+        return false;
+    }
+    function initMonsterState(id) {
+        monsterTestStates[id] = {};
+        for (let t of testCategories) monsterTestStates[id][t.key] = "";
+        if (monsterNotes[id] === undefined) monsterNotes[id] = "";
+    }
+    function deleteMonsterState(id) { 
+        delete monsterTestStates[id];
+        delete monsterNotes[id];
+    }
+
+    function sortMonsters(list) {
+        const order = { "minion":1, "elite":2, "boss":3 };
+        return [...list].sort((a,b)=>{
+            if (currentSort === "id") return a.id - b.id;
+            if (currentSort === "name") return a.name.localeCompare(b.name);
+            if (currentSort === "type") return a.type.localeCompare(b.type);
+            if (currentSort === "rank") return order[a.rank] - order[b.rank];
+            return 0;
+        });
+    }
+    function getDisplayMonsters() {
+        let list = currentFilter === "nochange" ? monstersBase.filter(m=>!m.isChanged) : (currentFilter === "changed" ? monstersBase.filter(m=>m.isChanged) : [...monstersBase]);
+        if (searchKeyword.trim()) {
+            const kw = searchKeyword.trim().toLowerCase();
+            list = list.filter(m => m.name.toLowerCase().includes(kw) || m.type.toLowerCase().includes(kw));
+        }
+        return sortMonsters(list);
+    }
+    function updateCounts() {
+        document.getElementById('countAll').innerText = monstersBase.length;
+        document.getElementById('countNoChange').innerText = monstersBase.filter(m=>!m.isChanged).length;
+        document.getElementById('countChanged').innerText = monstersBase.filter(m=>m.isChanged).length;
+        document.querySelectorAll('.summary-card').forEach(c => {
+            if (c.getAttribute('data-filter') === currentFilter) c.classList.add('active');
+            else c.classList.remove('active');
+        });
+    }
+
+    // ========== 主题切换 ==========
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        const btn = document.getElementById('themeToggle');
+        if (theme === 'light') {
+            btn.innerHTML = '🌙 夜间模式';
+        } else {
+            btn.innerHTML = '☀️ 日间模式';
+        }
+    }
+    function loadTheme() {
+        const saved = localStorage.getItem('theme');
+        if (saved === 'light') setTheme('light');
+        else setTheme('dark');
+    }
+
+    // ========== 编辑弹窗 ==========
+    let currentEditMonsterId = null;
+    function openEditModal(monsterId) {
+        const monster = monstersBase.find(m => m.id === monsterId);
+        if (!monster) return;
+        currentEditMonsterId = monsterId;
+        document.getElementById('editId').value = monster.id;
+        document.getElementById('editName').value = monster.name;
+        document.getElementById('editType').value = monster.type;
+        document.getElementById('editRank').value = monster.rank;
+        document.getElementById('editHp').value = monster.baseHp;
+        document.getElementById('editAtk').value = monster.baseAtk;
+        document.getElementById('editArmor').value = monster.baseArmor;
+        document.getElementById('editIsChanged').checked = monster.isChanged;
+        document.getElementById('editImage').value = '';
+        document.getElementById('editModal').style.display = 'flex';
+    }
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+        currentEditMonsterId = null;
+    }
+    function saveEditMonster(e) {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('editId').value);
+        const monster = monstersBase.find(m => m.id === id);
+        if (!monster) return;
+        const newName = document.getElementById('editName').value.trim();
+        if (!newName) { showToast("名称不能为空", "#ffb3a0"); return; }
+        const newType = document.getElementById('editType').value.trim() || "未知";
+        const newRank = document.getElementById('editRank').value;
+        const newHp = parseInt(document.getElementById('editHp').value) || 100;
+        const newAtk = parseInt(document.getElementById('editAtk').value) || 100;
+        const newArmor = parseFloat(document.getElementById('editArmor').value);
+        const finalArmor = isNaN(newArmor) ? 100 : newArmor;
+        const newIsChanged = document.getElementById('editIsChanged').checked;
+        const imgFile = document.getElementById('editImage').files[0];
+        const finishUpdate = (imgData) => {
+            monster.name = newName;
+            monster.type = newType;
+            monster.rank = newRank;
+            monster.baseHp = newHp;
+            monster.baseAtk = newAtk;
+            monster.baseArmor = finalArmor;
+            monster.isChanged = newIsChanged;
+            if (imgData) {
+                monster.imageData = imgData;
+                monster.image = "";
+            }
+            saveAllData();
+            renderGrid();
+            if (currentExpandedId === id) {
+                const card = document.querySelector(`.monster-card[data-id="${id}"]`);
+                if (card) toggleDetail(card, id);
+                else closeDetail();
+            }
+            closeEditModal();
+            showToast("✨ 怪物数据已更新", "#3c7a5a");
+        };
+        if (imgFile) {
+            const r = new FileReader();
+            r.onload = e => finishUpdate(e.target.result);
+            r.readAsDataURL(imgFile);
+        } else {
+            finishUpdate(null);
+        }
+    }
+
+    // ========== 备注保存 ==========
+    function saveNote(monsterId) {
+        const textarea = document.getElementById(`note-${monsterId}`);
+        if (textarea) {
+            monsterNotes[monsterId] = textarea.value;
+            saveAllData();
+            showToast("📝 备注已保存", "#3c7a5a");
+        }
+    }
+
+    // ========== 网格渲染 ==========
+    function renderGrid() {
+        const grid = document.getElementById('monsterGrid');
+        const list = getDisplayMonsters();
+        grid.innerHTML = '';
+        list.forEach(m => {
+            const card = document.createElement('div');
+            card.className = 'monster-card';
+            card.dataset.id = m.id;
+            const rankCls = m.rank;
+            const modCls = m.isChanged ? 'changed' : 'no-change';
+            const modText = m.isChanged ? '🔄 改动' : '✅ 无改动';
+            card.innerHTML = `
+                <input type="checkbox" class="monster-checkbox" data-id="${m.id}" ${selectedIds.has(m.id) ? 'checked' : ''}>
+                <div class="modify-badge ${modCls}">${modText}</div>
+                <div class="rank-badge ${rankCls}">${getRankText(m.rank)}</div>
+                <div class="monster-image"></div>
+                <div class="monster-name">${m.name}</div>
+            `;
+            const imgDiv = card.querySelector('.monster-image');
+            if (m.imageData) imgDiv.innerHTML = `<img src="${m.imageData}" alt="image">`;
+            else imgDiv.innerText = m.image || m.id;
+            card.addEventListener('click', (e) => {
+                if (e.target.type === 'checkbox') return;
+                toggleDetail(card, m.id);
+            });
+            const cb = card.querySelector('.monster-checkbox');
+            cb.addEventListener('change', (e) => { e.stopPropagation(); cb.checked ? selectedIds.add(m.id) : selectedIds.delete(m.id); });
+            grid.appendChild(card);
+        });
+        if (!list.length) grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:1.5rem;">✨ 暂无怪物数据 ✨</div>';
+        if (currentExpandedCard && !document.body.contains(currentExpandedCard)) closeDetail();
+    }
+
+    function toggleDetail(card, monsterId) {
+        if (currentExpandedCard === card && currentExpandedId === monsterId) {
+            closeDetail();
+        } else {
+            if (currentExpandedCard) closeDetail();
+            const detailDiv = document.createElement('div');
+            detailDiv.className = 'detail-expanded';
+            detailDiv.id = `detail-${monsterId}`;
+            card.insertAdjacentElement('afterend', detailDiv);
+            currentExpandedCard = card;
+            currentExpandedId = monsterId;
+            renderDetailContent(detailDiv, monsterId);
+        }
+    }
+
+    function closeDetail() {
+        if (currentExpandedCard && currentExpandedId) {
+            const detailDiv = document.getElementById(`detail-${currentExpandedId}`);
+            if (detailDiv) detailDiv.remove();
+        }
+        currentExpandedCard = null;
+        currentExpandedId = null;
+    }
+
+    function renderDetailContent(container, monsterId) {
+        const monster = monstersBase.find(m => m.id === monsterId);
+        if (!monster) return;
+        const stats = getDynamicStats(monster);
+        const modifyCls = monster.isChanged ? 'changed' : 'no-change';
+        const modifyTag = monster.isChanged ? '🔄 改动' : '✅ 无改动';
+        const avatarHtml = monster.imageData ? `<img src="${monster.imageData}">` : `<span>${monster.image || monster.id}</span>`;
+        const currentNote = monsterNotes[monsterId] || "";
+
+        let testRowsHtml = '';
+        for (let t of testCategories) {
+            const cur = monsterTestStates[monster.id][t.key] || "";
+            let opts = '';
+            for (let opt of statusOptions) opts += `<option value="${opt.value}" ${cur===opt.value ? 'selected' : ''}>${opt.label}</option>`;
+            testRowsHtml += `<div class="test-row">
+                <div class="test-label">${t.label}</div>
+                <div class="button-select-group">
+                    <button class="action-btn test-trigger" data-test="${t.key}">${t.label}</button>
+                    <select class="status-select" data-test="${t.key}" data-mid="${monster.id}">${opts}</select>
+                </div>
+            </div>`;
+        }
+
+        container.innerHTML = `
+            <div class="detail-header">
+                <div class="detail-avatar">${avatarHtml}</div>
+                <div class="detail-title">
+                    <h2>${monster.name}<span class="modify-tag-detail ${modifyCls}">${modifyTag}</span></h2>
+                    <div class="detail-meta">ID: ${monster.id} | 模式: ${currentMode === 'solo' ? '单人' : '多人'}</div>
+                </div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-label">类型</div><div class="stat-value">${monster.type}</div></div>
+                <div class="stat-card"><div class="stat-label">等级</div><div class="stat-value">${getRankText(monster.rank)}</div></div>
+                <div class="stat-card"><div class="stat-label">❤️血量</div><div class="stat-value">${stats.hp}</div></div>
+                <div class="stat-card"><div class="stat-label">⚔️攻击</div><div class="stat-value">${stats.atk}</div></div>
+                <div class="stat-card"><div class="stat-label">🛡️韧性</div><div class="stat-value">${stats.armor}</div></div>
+            </div>
+            <div class="test-section">
+                <h3>📋 测试状态</h3>
+                <div class="test-items">${testRowsHtml}</div>
+            </div>
+            <div class="note-section">
+                <h3>📝 备注</h3>
+                <textarea id="note-${monster.id}" class="note-textarea" rows="3" placeholder="添加备注信息...">${escapeHtml(currentNote)}</textarea>
+                <div style="display: flex; justify-content: flex-end; margin-top: 0.3rem;">
+                    <button class="note-save-btn" data-note-id="${monster.id}">💾 保存备注</button>
+                </div>
+            </div>
+            <div class="button-bar">
+                <button class="edit-btn" id="detailEditBtn">✏️ 编辑</button>
+                <button class="close-btn" id="detailCloseBtn">✖ 收起</button>
+            </div>
+            <div class="info-note">点击编辑可修改怪物数据 | 备注自动保存</div>
+        `;
+
+        // 绑定测试项事件
+        container.querySelectorAll('.status-select').forEach(sel => {
+            const testKey = sel.getAttribute('data-test');
+            const mid = parseInt(sel.getAttribute('data-mid'));
+            const cur = monsterTestStates[mid][testKey] || "";
+            applySelectStyle(sel, cur);
+            sel.addEventListener('change', (e) => {
+                monsterTestStates[mid][testKey] = e.target.value;
+                applySelectStyle(sel, e.target.value);
+                saveAllData();
+                showToast(`✅ 已更新 ${testCategories.find(t=>t.key===testKey)?.label}`, "#c2e0b5");
+            });
+        });
+        container.querySelectorAll('.test-trigger').forEach(btn => {
+            const row = btn.closest('.test-row');
+            const sel = row?.querySelector('.status-select');
+            btn.addEventListener('click', () => {
+                if (sel) showToast(`📌 当前: ${sel.value === "" ? "空" : sel.value}`, "#e2efd4");
+            });
+        });
+
+        // 备注保存按钮
+        const noteSaveBtn = container.querySelector('.note-save-btn');
+        if (noteSaveBtn) {
+            noteSaveBtn.addEventListener('click', () => saveNote(monster.id));
+        }
+
+        const editBtn = container.querySelector('#detailEditBtn');
+        if (editBtn) editBtn.addEventListener('click', () => openEditModal(monster.id));
+        const closeBtn = container.querySelector('#detailCloseBtn');
+        if (closeBtn) closeBtn.addEventListener('click', () => closeDetail());
+    }
+
+    function applySelectStyle(sel, val) {
+        sel.classList.remove('select-status-empty','select-status-pass','select-status-defective','select-status-fail','select-status-untestable');
+        if (val === "") sel.classList.add('select-status-empty');
+        else if (val === "Pass") sel.classList.add('select-status-pass');
+        else if (val === "Defective") sel.classList.add('select-status-defective');
+        else if (val === "Fail") sel.classList.add('select-status-fail');
+        else if (val === "Untestable") sel.classList.add('select-status-untestable');
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // 删除、添加、导入等函数
+    function deleteSelected() {
+        if (!selectedIds.size) { showToast("请先勾选怪物", "#ffb3a0"); return; }
+        if (confirm(`删除 ${selectedIds.size} 个怪物？`)) {
+            monstersBase = monstersBase.filter(m => !selectedIds.has(m.id));
+            selectedIds.forEach(id => deleteMonsterState(id));
+            selectedIds.clear();
+            updateCounts();
+            renderGrid();
+            if (currentExpandedId && !monstersBase.some(m => m.id === currentExpandedId)) closeDetail();
+            saveAllData();
+            showToast(`🗑️ 已删除所选怪物`, "#ffb3a0");
+        }
+    }
+
+    function addMonster(e) {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('newId').value);
+        if (isNaN(id) || monstersBase.some(m => m.id === id)) { showToast("ID无效或重复", "#ffb3a0"); return; }
+        const name = document.getElementById('newName').value.trim();
+        if (!name) { showToast("名称不能为空", "#ffb3a0"); return; }
+        const rank = parseRank(document.getElementById('newRank').value);
+        let type = document.getElementById('newType').value.trim();
+        if (!type) type = "未知";
+        const hp = parseInt(document.getElementById('newHp').value) || 100;
+        const atk = parseInt(document.getElementById('newAtk').value) || 100;
+        const armor = parseArmor(document.getElementById('newArmor').value);
+        const isChanged = document.getElementById('newIsChanged').checked;
+        const imgFile = document.getElementById('newImage').files[0];
+        const finish = (imgData) => {
+            monstersBase.push({ id, name, type, rank, baseHp: hp, baseAtk: atk, baseArmor: armor, isChanged, image: imgData ? "" : id.toString(), imageData: imgData || null });
+            initMonsterState(id);
+            updateCounts();
+            renderGrid();
+            saveAllData();
+            showToast(`✨ 添加 ${name} 成功`, "#9bc48f");
+            document.getElementById('addModal').style.display = 'none';
+            document.getElementById('addForm').reset();
+        };
+        if (imgFile) {
+            const r = new FileReader();
+            r.onload = e => finish(e.target.result);
+            r.readAsDataURL(imgFile);
+        } else finish(null);
+    }
+
+    function importFromFile(file) {
+        const r = new FileReader();
+        r.onload = e => {
+            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+            if (!rows.length) { showToast("表格为空", "#ffb3a0"); return; }
+            const newList = [];
+            for (let row of rows) {
+                const id = parseInt(row["id"] || row["ID"]);
+                if (isNaN(id)) continue;
+                const name = row["怪物名"] || row["怪物名称"];
+                if (!name) continue;
+                const rank = parseRank(row["怪物标签"]);
+                const type = parseType(row["怪物类型"]);
+                const hp = parseFloat(row["生命值"]) || 100;
+                const atk = parseFloat(row["攻击力"]) || 100;
+                const armor = parseArmor(row["韧性值"]);
+                const isChangedRaw = row["是否是新增（改动）怪物，无改动是无"];
+                const isChanged = !(isChangedRaw === "无" || !isChangedRaw);
+                const image = row["怪物图片"] || "";
+                newList.push({ id, name, type, rank, baseHp: hp, baseAtk: atk, baseArmor: armor, isChanged, image, imageData: null });
+            }
+            if (!newList.length) { showToast("无有效数据", "#ffb3a0"); return; }
+            monstersBase = newList;
+            monsterTestStates = {};
+            monsterNotes = {};
+            for (let m of monstersBase) initMonsterState(m.id);
+            updateCounts();
+            renderGrid();
+            closeDetail();
+            document.getElementById('fileInfo').innerText = `${monstersBase.length}条`;
+            saveAllData();
+            showToast(`📂 成功导入 ${monstersBase.length} 个怪物`, "#9bc48f");
+        };
+        r.readAsArrayBuffer(file);
+    }
+
+    function showToast(msg, bg) {
+        let t = document.querySelector('.custom-toast');
+        if (t) t.remove();
+        const toast = document.createElement('div');
+        toast.className = 'custom-toast';
+        toast.innerText = msg;
+        toast.style.position = 'fixed';
+        toast.style.bottom = '20px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.backgroundColor = bg;
+        toast.style.color = '#ffffff';
+        toast.style.padding = '5px 14px';
+        toast.style.borderRadius = '30px';
+        toast.style.fontSize = '0.75rem';
+        toast.style.zIndex = 10000;
+        toast.style.border = '1px solid var(--accent)';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 1800);
+    }
+
+    function refreshAfterFilter() {
+        closeDetail();
+        renderGrid();
+    }
+
+    function bindEvents() {
+        document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => {
+            currentMode = btn.getAttribute('data-mode');
+            document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('modeHint').innerText = currentMode === 'solo' ? '单人: 小怪攻-10% / 精英攻-10% 血-25% 韧-20% / boss韧-20%' : '多人: 精英怪韧性+33%';
+            if (currentExpandedId) {
+                const card = document.querySelector(`.monster-card[data-id="${currentExpandedId}"]`);
+                if (card) { closeDetail(); toggleDetail(card, currentExpandedId); }
+                else closeDetail();
+            } else renderGrid();
+        }));
+        document.querySelectorAll('.summary-card').forEach(card => card.addEventListener('click', () => {
+            currentFilter = card.getAttribute('data-filter');
+            refreshAfterFilter();
+            updateCounts();
+        }));
+        document.querySelectorAll('.sort-btn').forEach(btn => btn.addEventListener('click', () => {
+            currentSort = btn.getAttribute('data-sort');
+            document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            refreshAfterFilter();
+        }));
+        const search = document.getElementById('searchInput');
+        const clear = document.getElementById('clearSearchBtn');
+        search.addEventListener('input', e => { searchKeyword = e.target.value; refreshAfterFilter(); });
+        clear.addEventListener('click', () => { search.value = ''; searchKeyword = ''; refreshAfterFilter(); });
+        
+        // 导入按钮增加确认弹窗
+        const importBtn = document.getElementById('importBtn');
+        const fileUpload = document.getElementById('fileUpload');
+        importBtn.addEventListener('click', () => {
+            if (confirm('⚠️ 导入表格数据将覆盖所有已保存内容，是否确认导入？')) {
+                fileUpload.click();
+            }
+        });
+        fileUpload.addEventListener('change', e => { if(e.target.files[0]) importFromFile(e.target.files[0]); e.target.value=''; });
+        
+        document.getElementById('addMonsterBtn').addEventListener('click', () => document.getElementById('addModal').style.display = 'flex');
+        document.getElementById('cancelAddBtn').addEventListener('click', () => document.getElementById('addModal').style.display = 'none');
+        document.getElementById('addForm').addEventListener('submit', addMonster);
+        document.getElementById('deleteSelectedBtn').addEventListener('click', deleteSelected);
+        document.getElementById('manualSaveBtn').addEventListener('click', saveAllData);
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            setTheme(current === 'light' ? 'dark' : 'light');
+        });
+        document.getElementById('cancelEditBtn').addEventListener('click', closeEditModal);
+        document.getElementById('editForm').addEventListener('submit', saveEditMonster);
+    }
+
+    function init() {
+        loadTheme();
+        if (!loadAllData() || !monstersBase.length) {
+            monstersBase = [];
+            monsterTestStates = {};
+            monsterNotes = {};
+            updateCounts();
+            renderGrid();
+        } else {
+            updateCounts();
+            renderGrid();
+            document.getElementById('fileInfo').innerText = `${monstersBase.length}条`;
+        }
+        bindEvents();
+    }
+    init();
+</script>
+</body>
+</html>
