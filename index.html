@@ -1,9 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>怪物图鉴</title>
+    <title>怪物图鉴 · 云端共享版</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * {
@@ -12,9 +13,7 @@
             box-sizing: border-box;
         }
 
-        /* ========== 主题变量 ========== */
         :root {
-            /* 暗色主题（深色系） */
             --bg-primary: #0f172a;
             --bg-secondary: #1e293b;
             --bg-card: linear-gradient(145deg, #1e293b, #0f172a);
@@ -33,7 +32,6 @@
         }
 
         [data-theme="light"] {
-            /* 日间模式（浅色系） */
             --bg-primary: #f8fafc;
             --bg-secondary: #ffffff;
             --bg-card: #ffffff;
@@ -72,7 +70,6 @@
             border: 1px solid var(--border);
         }
 
-        /* 头部控制栏 */
         .header-controls {
             display: flex;
             justify-content: space-between;
@@ -169,7 +166,6 @@
             border: 1px solid var(--border);
         }
 
-        /* 主题切换按钮 */
         .theme-toggle {
             background: var(--card-bg);
             border: 1px solid var(--border);
@@ -184,7 +180,6 @@
             background: var(--hover-bg);
         }
 
-        /* 标题 - 骷髅样式 */
         .header {
             margin-bottom: 1.5rem;
             text-align: center;
@@ -220,7 +215,6 @@
             margin: 0.5rem auto 0;
         }
 
-        /* 搜索排序栏 */
         .search-sort-bar {
             display: flex;
             flex-wrap: wrap;
@@ -293,7 +287,6 @@
             font-weight: bold;
         }
 
-        /* 分类汇总栏 */
         .summary-bar {
             display: flex;
             gap: 0.8rem;
@@ -342,7 +335,6 @@
             text-align: center;
         }
 
-        /* 怪物网格卡片 */
         .monster-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(170px, 200px));
@@ -439,7 +431,6 @@
             border: 1px solid var(--border);
         }
 
-        /* 内嵌详情面板 */
         .detail-expanded {
             grid-column: 1 / -1;
             background: var(--bg-secondary);
@@ -623,7 +614,6 @@
             background: #4a7a5a;
         }
 
-        /* 备注区域样式 */
         .note-section {
             margin-top: 0.8rem;
             border-top: 1px solid var(--border);
@@ -668,7 +658,6 @@
             background: var(--hover-bg);
         }
 
-        /* 模态框 */
         .modal {
             display: none;
             position: fixed;
@@ -798,7 +787,7 @@
     </div>
 
     <div class="header">
-        <h1>怪物图鉴</h1>
+        <h1>怪物图鉴 · 云端共享版</h1>
     </div>
 
     <div class="search-sort-bar">
@@ -869,10 +858,15 @@
 </div>
 
 <script>
-    // ======================== 全局数据 ========================
+    // ========== Supabase 配置（请替换为您的项目密钥）==========
+    const SUPABASE_URL = 'https://lvfucusklimtbrdephqj.supabase.co';  // 👈 替换为你的 Project URL
+    const SUPABASE_ANON_KEY = 'sb_publishable_RoqpRQpprvMi-fSx9S7Nxw_w1Vh7wMS';               // 👈 替换为你的 anon/public key
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ========== 全局状态 ==========
     let monstersBase = [];
     let monsterTestStates = {};
-    let monsterNotes = {};      // 存储备注
+    let monsterNotes = {};
     let currentFilter = "all";
     let currentMode = "solo";
     let currentSort = "id";
@@ -927,46 +921,89 @@
     }
     function getRankText(r) { return rankTextMap[r]; }
 
-    const STORAGE_KEY = 'monsterBookData_v2';
-    function saveAllData() {
-        const dataToSave = {
-            monsters: monstersBase,
-            testStates: monsterTestStates,
-            notes: monsterNotes,
-            version: 3
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
-        showToast("✨ 数据已保存", "#3c7a5a");
-    }
-    function loadAllData() {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (!saved) return false;
-        try {
-            const p = JSON.parse(saved);
-            if (p.monsters) {
-                monstersBase = p.monsters;
-                monsterTestStates = p.testStates || {};
-                monsterNotes = p.notes || {};
-                for (let m of monstersBase) {
-                    if (!monsterTestStates[m.id]) monsterTestStates[m.id] = {};
-                    for (let t of testCategories) if (monsterTestStates[m.id][t.key] === undefined) monsterTestStates[m.id][t.key] = "";
-                    if (monsterNotes[m.id] === undefined) monsterNotes[m.id] = "";
-                }
-                return true;
-            }
-        } catch(e) {}
-        return false;
-    }
-    function initMonsterState(id) {
-        monsterTestStates[id] = {};
-        for (let t of testCategories) monsterTestStates[id][t.key] = "";
-        if (monsterNotes[id] === undefined) monsterNotes[id] = "";
-    }
-    function deleteMonsterState(id) { 
-        delete monsterTestStates[id];
-        delete monsterNotes[id];
+    // ========== 云端数据操作 ==========
+    async function loadAllData() {
+        showToast("加载数据中...", "#3c7a5a");
+        const { data: monsters, error: mErr } = await supabase.from('monsters').select('*').order('id');
+        if (mErr) { console.error(mErr); showToast("加载失败", "#ffb3a0"); return false; }
+        if (!monsters || monsters.length === 0) {
+            monstersBase = [];
+            monsterTestStates = {};
+            monsterNotes = {};
+            return true;
+        }
+        monstersBase = monsters.map(m => ({
+            ...m,
+            rank: m.rank,
+            imageData: m.image_data,
+            baseHp: m.base_hp,
+            baseAtk: m.base_atk,
+            baseArmor: m.base_armor,
+            isChanged: m.is_changed
+        }));
+        const { data: tests, error: tErr } = await supabase.from('monster_test_states').select('*');
+        if (!tErr && tests) {
+            monsterTestStates = {};
+            tests.forEach(t => { if(!monsterTestStates[t.monster_id]) monsterTestStates[t.monster_id]={}; monsterTestStates[t.monster_id][t.test_key]=t.test_value||""; });
+        }
+        const { data: notes, error: nErr } = await supabase.from('monster_notes').select('*');
+        if (!nErr && notes) {
+            monsterNotes = {};
+            notes.forEach(n => { monsterNotes[n.monster_id]=n.note_text||""; });
+        }
+        for(let m of monstersBase) {
+            if(!monsterTestStates[m.id]) monsterTestStates[m.id]={};
+            for(let t of testCategories) if(monsterTestStates[m.id][t.key]===undefined) monsterTestStates[m.id][t.key]="";
+            if(monsterNotes[m.id]===undefined) monsterNotes[m.id]="";
+        }
+        return true;
     }
 
+    async function saveAllData() {
+        // 保存怪物
+        for(let monster of monstersBase) {
+            const { error } = await supabase.from('monsters').upsert({
+                id: monster.id,
+                name: monster.name,
+                type: monster.type,
+                rank: monster.rank,
+                base_hp: monster.baseHp,
+                base_atk: monster.baseAtk,
+                base_armor: monster.baseArmor,
+                is_changed: monster.isChanged,
+                image_data: monster.imageData
+            }, { onConflict: 'id' });
+            if(error) console.error(error);
+        }
+        // 保存测试状态
+        for(let mid in monsterTestStates) {
+            for(let t of testCategories) {
+                await supabase.from('monster_test_states').upsert({
+                    monster_id: parseInt(mid),
+                    test_key: t.key,
+                    test_value: monsterTestStates[mid][t.key] || ""
+                }, { onConflict: 'monster_id, test_key' });
+            }
+        }
+        // 保存备注
+        for(let mid in monsterNotes) {
+            await supabase.from('monster_notes').upsert({
+                monster_id: parseInt(mid),
+                note_text: monsterNotes[mid] || "",
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'monster_id' });
+        }
+        showToast("✨ 已同步到云端", "#3c7a5a");
+    }
+
+    // 删除怪物（同时级联删除测试状态和备注，由数据库外键处理）
+    async function deleteMonsters(ids) {
+        const { error } = await supabase.from('monsters').delete().in('id', ids);
+        if (error) { console.error(error); showToast("删除失败", "#ffb3a0"); return false; }
+        return true;
+    }
+
+    // ========== UI 渲染逻辑（与之前版本一致） ==========
     function sortMonsters(list) {
         const order = { "minion":1, "elite":2, "boss":3 };
         return [...list].sort((a,b)=>{
@@ -995,101 +1032,6 @@
         });
     }
 
-    // ========== 主题切换 ==========
-    function setTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-        const btn = document.getElementById('themeToggle');
-        if (theme === 'light') {
-            btn.innerHTML = '🌙 夜间模式';
-        } else {
-            btn.innerHTML = '☀️ 日间模式';
-        }
-    }
-    function loadTheme() {
-        const saved = localStorage.getItem('theme');
-        if (saved === 'light') setTheme('light');
-        else setTheme('dark');
-    }
-
-    // ========== 编辑弹窗 ==========
-    let currentEditMonsterId = null;
-    function openEditModal(monsterId) {
-        const monster = monstersBase.find(m => m.id === monsterId);
-        if (!monster) return;
-        currentEditMonsterId = monsterId;
-        document.getElementById('editId').value = monster.id;
-        document.getElementById('editName').value = monster.name;
-        document.getElementById('editType').value = monster.type;
-        document.getElementById('editRank').value = monster.rank;
-        document.getElementById('editHp').value = monster.baseHp;
-        document.getElementById('editAtk').value = monster.baseAtk;
-        document.getElementById('editArmor').value = monster.baseArmor;
-        document.getElementById('editIsChanged').checked = monster.isChanged;
-        document.getElementById('editImage').value = '';
-        document.getElementById('editModal').style.display = 'flex';
-    }
-    function closeEditModal() {
-        document.getElementById('editModal').style.display = 'none';
-        currentEditMonsterId = null;
-    }
-    function saveEditMonster(e) {
-        e.preventDefault();
-        const id = parseInt(document.getElementById('editId').value);
-        const monster = monstersBase.find(m => m.id === id);
-        if (!monster) return;
-        const newName = document.getElementById('editName').value.trim();
-        if (!newName) { showToast("名称不能为空", "#ffb3a0"); return; }
-        const newType = document.getElementById('editType').value.trim() || "未知";
-        const newRank = document.getElementById('editRank').value;
-        const newHp = parseInt(document.getElementById('editHp').value) || 100;
-        const newAtk = parseInt(document.getElementById('editAtk').value) || 100;
-        const newArmor = parseFloat(document.getElementById('editArmor').value);
-        const finalArmor = isNaN(newArmor) ? 100 : newArmor;
-        const newIsChanged = document.getElementById('editIsChanged').checked;
-        const imgFile = document.getElementById('editImage').files[0];
-        const finishUpdate = (imgData) => {
-            monster.name = newName;
-            monster.type = newType;
-            monster.rank = newRank;
-            monster.baseHp = newHp;
-            monster.baseAtk = newAtk;
-            monster.baseArmor = finalArmor;
-            monster.isChanged = newIsChanged;
-            if (imgData) {
-                monster.imageData = imgData;
-                monster.image = "";
-            }
-            saveAllData();
-            renderGrid();
-            if (currentExpandedId === id) {
-                const card = document.querySelector(`.monster-card[data-id="${id}"]`);
-                if (card) toggleDetail(card, id);
-                else closeDetail();
-            }
-            closeEditModal();
-            showToast("✨ 怪物数据已更新", "#3c7a5a");
-        };
-        if (imgFile) {
-            const r = new FileReader();
-            r.onload = e => finishUpdate(e.target.result);
-            r.readAsDataURL(imgFile);
-        } else {
-            finishUpdate(null);
-        }
-    }
-
-    // ========== 备注保存 ==========
-    function saveNote(monsterId) {
-        const textarea = document.getElementById(`note-${monsterId}`);
-        if (textarea) {
-            monsterNotes[monsterId] = textarea.value;
-            saveAllData();
-            showToast("📝 备注已保存", "#3c7a5a");
-        }
-    }
-
-    // ========== 网格渲染 ==========
     function renderGrid() {
         const grid = document.getElementById('monsterGrid');
         const list = getDisplayMonsters();
@@ -1145,6 +1087,15 @@
         }
         currentExpandedCard = null;
         currentExpandedId = null;
+    }
+
+    function applySelectStyle(sel, val) {
+        sel.classList.remove('select-status-empty','select-status-pass','select-status-defective','select-status-fail','select-status-untestable');
+        if (val === "") sel.classList.add('select-status-empty');
+        else if (val === "Pass") sel.classList.add('select-status-pass');
+        else if (val === "Defective") sel.classList.add('select-status-defective');
+        else if (val === "Fail") sel.classList.add('select-status-fail');
+        else if (val === "Untestable") sel.classList.add('select-status-untestable');
     }
 
     function renderDetailContent(container, monsterId) {
@@ -1203,16 +1154,15 @@
             <div class="info-note">点击编辑可修改怪物数据 | 备注自动保存</div>
         `;
 
-        // 绑定测试项事件
         container.querySelectorAll('.status-select').forEach(sel => {
             const testKey = sel.getAttribute('data-test');
             const mid = parseInt(sel.getAttribute('data-mid'));
             const cur = monsterTestStates[mid][testKey] || "";
             applySelectStyle(sel, cur);
-            sel.addEventListener('change', (e) => {
+            sel.addEventListener('change', async (e) => {
                 monsterTestStates[mid][testKey] = e.target.value;
                 applySelectStyle(sel, e.target.value);
-                saveAllData();
+                await saveAllData();
                 showToast(`✅ 已更新 ${testCategories.find(t=>t.key===testKey)?.label}`, "#c2e0b5");
             });
         });
@@ -1224,25 +1174,22 @@
             });
         });
 
-        // 备注保存按钮
         const noteSaveBtn = container.querySelector('.note-save-btn');
         if (noteSaveBtn) {
-            noteSaveBtn.addEventListener('click', () => saveNote(monster.id));
+            noteSaveBtn.addEventListener('click', async () => {
+                const textarea = document.getElementById(`note-${monster.id}`);
+                if (textarea) {
+                    monsterNotes[monster.id] = textarea.value;
+                    await saveAllData();
+                    showToast("📝 备注已保存", "#3c7a5a");
+                }
+            });
         }
 
         const editBtn = container.querySelector('#detailEditBtn');
         if (editBtn) editBtn.addEventListener('click', () => openEditModal(monster.id));
         const closeBtn = container.querySelector('#detailCloseBtn');
         if (closeBtn) closeBtn.addEventListener('click', () => closeDetail());
-    }
-
-    function applySelectStyle(sel, val) {
-        sel.classList.remove('select-status-empty','select-status-pass','select-status-defective','select-status-fail','select-status-untestable');
-        if (val === "") sel.classList.add('select-status-empty');
-        else if (val === "Pass") sel.classList.add('select-status-pass');
-        else if (val === "Defective") sel.classList.add('select-status-defective');
-        else if (val === "Fail") sel.classList.add('select-status-fail');
-        else if (val === "Untestable") sel.classList.add('select-status-untestable');
     }
 
     function escapeHtml(str) {
@@ -1255,22 +1202,72 @@
         });
     }
 
-    // 删除、添加、导入等函数
-    function deleteSelected() {
-        if (!selectedIds.size) { showToast("请先勾选怪物", "#ffb3a0"); return; }
-        if (confirm(`删除 ${selectedIds.size} 个怪物？`)) {
-            monstersBase = monstersBase.filter(m => !selectedIds.has(m.id));
-            selectedIds.forEach(id => deleteMonsterState(id));
-            selectedIds.clear();
-            updateCounts();
+    // ========== 编辑弹窗 ==========
+    let currentEditMonsterId = null;
+    function openEditModal(monsterId) {
+        const monster = monstersBase.find(m => m.id === monsterId);
+        if (!monster) return;
+        currentEditMonsterId = monsterId;
+        document.getElementById('editId').value = monster.id;
+        document.getElementById('editName').value = monster.name;
+        document.getElementById('editType').value = monster.type;
+        document.getElementById('editRank').value = monster.rank;
+        document.getElementById('editHp').value = monster.baseHp;
+        document.getElementById('editAtk').value = monster.baseAtk;
+        document.getElementById('editArmor').value = monster.baseArmor;
+        document.getElementById('editIsChanged').checked = monster.isChanged;
+        document.getElementById('editImage').value = '';
+        document.getElementById('editModal').style.display = 'flex';
+    }
+    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; currentEditMonsterId = null; }
+    async function saveEditMonster(e) {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('editId').value);
+        const monster = monstersBase.find(m => m.id === id);
+        if (!monster) return;
+        const newName = document.getElementById('editName').value.trim();
+        if (!newName) { showToast("名称不能为空", "#ffb3a0"); return; }
+        const newType = document.getElementById('editType').value.trim() || "未知";
+        const newRank = document.getElementById('editRank').value;
+        const newHp = parseInt(document.getElementById('editHp').value) || 100;
+        const newAtk = parseInt(document.getElementById('editAtk').value) || 100;
+        const newArmor = parseFloat(document.getElementById('editArmor').value);
+        const finalArmor = isNaN(newArmor) ? 100 : newArmor;
+        const newIsChanged = document.getElementById('editIsChanged').checked;
+        const imgFile = document.getElementById('editImage').files[0];
+        const finishUpdate = async (imgData) => {
+            monster.name = newName;
+            monster.type = newType;
+            monster.rank = newRank;
+            monster.baseHp = newHp;
+            monster.baseAtk = newAtk;
+            monster.baseArmor = finalArmor;
+            monster.isChanged = newIsChanged;
+            if (imgData) {
+                monster.imageData = imgData;
+                monster.image = "";
+            }
+            await saveAllData();
             renderGrid();
-            if (currentExpandedId && !monstersBase.some(m => m.id === currentExpandedId)) closeDetail();
-            saveAllData();
-            showToast(`🗑️ 已删除所选怪物`, "#ffb3a0");
+            if (currentExpandedId === id) {
+                const card = document.querySelector(`.monster-card[data-id="${id}"]`);
+                if (card) toggleDetail(card, id);
+                else closeDetail();
+            }
+            closeEditModal();
+            showToast("✨ 怪物数据已更新", "#3c7a5a");
+        };
+        if (imgFile) {
+            const r = new FileReader();
+            r.onload = e => finishUpdate(e.target.result);
+            r.readAsDataURL(imgFile);
+        } else {
+            finishUpdate(null);
         }
     }
 
-    function addMonster(e) {
+    // ========== 添加怪物 ==========
+    async function addMonster(e) {
         e.preventDefault();
         const id = parseInt(document.getElementById('newId').value);
         if (isNaN(id) || monstersBase.some(m => m.id === id)) { showToast("ID无效或重复", "#ffb3a0"); return; }
@@ -1284,12 +1281,15 @@
         const armor = parseArmor(document.getElementById('newArmor').value);
         const isChanged = document.getElementById('newIsChanged').checked;
         const imgFile = document.getElementById('newImage').files[0];
-        const finish = (imgData) => {
-            monstersBase.push({ id, name, type, rank, baseHp: hp, baseAtk: atk, baseArmor: armor, isChanged, image: imgData ? "" : id.toString(), imageData: imgData || null });
-            initMonsterState(id);
+        const finish = async (imgData) => {
+            const newMonster = { id, name, type, rank, baseHp: hp, baseAtk: atk, baseArmor: armor, isChanged, image: imgData ? "" : id.toString(), imageData: imgData || null };
+            monstersBase.push(newMonster);
+            monsterTestStates[id] = {};
+            for (let t of testCategories) monsterTestStates[id][t.key] = "";
+            monsterNotes[id] = "";
+            await saveAllData();
             updateCounts();
             renderGrid();
-            saveAllData();
             showToast(`✨ 添加 ${name} 成功`, "#9bc48f");
             document.getElementById('addModal').style.display = 'none';
             document.getElementById('addForm').reset();
@@ -1298,45 +1298,74 @@
             const r = new FileReader();
             r.onload = e => finish(e.target.result);
             r.readAsDataURL(imgFile);
-        } else finish(null);
+        } else {
+            finish(null);
+        }
     }
 
-    function importFromFile(file) {
-        const r = new FileReader();
-        r.onload = e => {
-            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-            const sheet = wb.Sheets[wb.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-            if (!rows.length) { showToast("表格为空", "#ffb3a0"); return; }
-            const newList = [];
-            for (let row of rows) {
-                const id = parseInt(row["id"] || row["ID"]);
-                if (isNaN(id)) continue;
-                const name = row["怪物名"] || row["怪物名称"];
-                if (!name) continue;
-                const rank = parseRank(row["怪物标签"]);
-                const type = parseType(row["怪物类型"]);
-                const hp = parseFloat(row["生命值"]) || 100;
-                const atk = parseFloat(row["攻击力"]) || 100;
-                const armor = parseArmor(row["韧性值"]);
-                const isChangedRaw = row["是否是新增（改动）怪物，无改动是无"];
-                const isChanged = !(isChangedRaw === "无" || !isChangedRaw);
-                const image = row["怪物图片"] || "";
-                newList.push({ id, name, type, rank, baseHp: hp, baseAtk: atk, baseArmor: armor, isChanged, image, imageData: null });
+    // ========== 删除选中 ==========
+    async function deleteSelected() {
+        if (!selectedIds.size) { showToast("请先勾选怪物", "#ffb3a0"); return; }
+        if (confirm(`删除 ${selectedIds.size} 个怪物？`)) {
+            const idsToDelete = Array.from(selectedIds);
+            const success = await deleteMonsters(idsToDelete);
+            if (success) {
+                monstersBase = monstersBase.filter(m => !selectedIds.has(m.id));
+                idsToDelete.forEach(id => { delete monsterTestStates[id]; delete monsterNotes[id]; });
+                selectedIds.clear();
+                updateCounts();
+                renderGrid();
+                if (currentExpandedId && !monstersBase.some(m => m.id === currentExpandedId)) closeDetail();
+                showToast(`🗑️ 已删除 ${idsToDelete.length} 个怪物`, "#9bc48f");
             }
-            if (!newList.length) { showToast("无有效数据", "#ffb3a0"); return; }
-            monstersBase = newList;
-            monsterTestStates = {};
-            monsterNotes = {};
-            for (let m of monstersBase) initMonsterState(m.id);
-            updateCounts();
-            renderGrid();
-            closeDetail();
-            document.getElementById('fileInfo').innerText = `${monstersBase.length}条`;
-            saveAllData();
-            showToast(`📂 成功导入 ${monstersBase.length} 个怪物`, "#9bc48f");
-        };
-        r.readAsArrayBuffer(file);
+        }
+    }
+
+    // ========== 导入表格（全量替换） ==========
+    function importFromFile(file) {
+        if (confirm('⚠️ 导入表格数据将覆盖所有已保存内容，是否确认导入？')) {
+            const r = new FileReader();
+            r.onload = async e => {
+                const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                const sheet = wb.Sheets[wb.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+                if (!rows.length) { showToast("表格为空", "#ffb3a0"); return; }
+                const newList = [];
+                for (let row of rows) {
+                    const id = parseInt(row["id"] || row["ID"]);
+                    if (isNaN(id)) continue;
+                    const name = row["怪物名"] || row["怪物名称"];
+                    if (!name) continue;
+                    const rank = parseRank(row["怪物标签"]);
+                    const type = parseType(row["怪物类型"]);
+                    const hp = parseFloat(row["生命值"]) || 100;
+                    const atk = parseFloat(row["攻击力"]) || 100;
+                    const armor = parseArmor(row["韧性值"]);
+                    const isChangedRaw = row["是否是新增（改动）怪物，无改动是无"];
+                    const isChanged = !(isChangedRaw === "无" || !isChangedRaw);
+                    const image = row["怪物图片"] || "";
+                    newList.push({ id, name, type, rank, baseHp: hp, baseAtk: atk, baseArmor: armor, isChanged, image, imageData: null });
+                }
+                if (!newList.length) { showToast("无有效数据", "#ffb3a0"); return; }
+                // 清空原有数据
+                await supabase.from('monsters').delete().neq('id', 0);
+                monstersBase = newList;
+                monsterTestStates = {};
+                monsterNotes = {};
+                for (let m of monstersBase) {
+                    monsterTestStates[m.id] = {};
+                    for (let t of testCategories) monsterTestStates[m.id][t.key] = "";
+                    monsterNotes[m.id] = "";
+                }
+                await saveAllData();
+                updateCounts();
+                renderGrid();
+                closeDetail();
+                document.getElementById('fileInfo').innerText = `${monstersBase.length}条`;
+                showToast(`📂 成功导入 ${monstersBase.length} 个怪物`, "#9bc48f");
+            };
+            r.readAsArrayBuffer(file);
+        }
     }
 
     function showToast(msg, bg) {
@@ -1365,6 +1394,19 @@
         renderGrid();
     }
 
+    // ========== 主题切换 ==========
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        const btn = document.getElementById('themeToggle');
+        btn.innerHTML = theme === 'light' ? '🌙 夜间模式' : '☀️ 日间模式';
+    }
+    function loadTheme() {
+        const saved = localStorage.getItem('theme');
+        setTheme(saved === 'light' ? 'light' : 'dark');
+    }
+
+    // ========== 绑定事件 ==========
     function bindEvents() {
         document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => {
             currentMode = btn.getAttribute('data-mode');
@@ -1393,43 +1435,28 @@
         search.addEventListener('input', e => { searchKeyword = e.target.value; refreshAfterFilter(); });
         clear.addEventListener('click', () => { search.value = ''; searchKeyword = ''; refreshAfterFilter(); });
         
-        // 导入按钮增加确认弹窗
-        const importBtn = document.getElementById('importBtn');
-        const fileUpload = document.getElementById('fileUpload');
-        importBtn.addEventListener('click', () => {
-            if (confirm('⚠️ 导入表格数据将覆盖所有已保存内容，是否确认导入？')) {
-                fileUpload.click();
-            }
-        });
-        fileUpload.addEventListener('change', e => { if(e.target.files[0]) importFromFile(e.target.files[0]); e.target.value=''; });
-        
+        document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileUpload').click());
+        document.getElementById('fileUpload').addEventListener('change', e => { if(e.target.files[0]) importFromFile(e.target.files[0]); e.target.value=''; });
         document.getElementById('addMonsterBtn').addEventListener('click', () => document.getElementById('addModal').style.display = 'flex');
         document.getElementById('cancelAddBtn').addEventListener('click', () => document.getElementById('addModal').style.display = 'none');
         document.getElementById('addForm').addEventListener('submit', addMonster);
         document.getElementById('deleteSelectedBtn').addEventListener('click', deleteSelected);
         document.getElementById('manualSaveBtn').addEventListener('click', saveAllData);
         document.getElementById('themeToggle').addEventListener('click', () => {
-            const current = document.documentElement.getAttribute('data-theme');
-            setTheme(current === 'light' ? 'dark' : 'light');
+            const cur = document.documentElement.getAttribute('data-theme');
+            setTheme(cur === 'light' ? 'dark' : 'light');
         });
         document.getElementById('cancelEditBtn').addEventListener('click', closeEditModal);
         document.getElementById('editForm').addEventListener('submit', saveEditMonster);
     }
 
-    function init() {
+    async function init() {
         loadTheme();
-        if (!loadAllData() || !monstersBase.length) {
-            monstersBase = [];
-            monsterTestStates = {};
-            monsterNotes = {};
-            updateCounts();
-            renderGrid();
-        } else {
-            updateCounts();
-            renderGrid();
-            document.getElementById('fileInfo').innerText = `${monstersBase.length}条`;
-        }
+        await loadAllData();
+        updateCounts();
+        renderGrid();
         bindEvents();
+        if (monstersBase.length) document.getElementById('fileInfo').innerText = `${monstersBase.length}条`;
     }
     init();
 </script>
