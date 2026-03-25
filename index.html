@@ -7,6 +7,7 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
+        /* ========== 样式代码（与用户提供的本地版本完全一致） ========== */
         * {
             margin: 0;
             padding: 0;
@@ -787,7 +788,7 @@
     </div>
 
     <div class="header">
-        <h1>怪物图鉴 · 云端共享版</h1>
+        <h1>怪物图鉴</h1>
     </div>
 
     <div class="search-sort-bar">
@@ -858,9 +859,9 @@
 </div>
 
 <script>
-    // ========== Supabase 配置（请替换为您的项目密钥）==========
-    const SUPABASE_URL = 'https://lvfucusklimtbrdephqj.supabase.co';  // 👈 替换为你的 Project URL
-    const SUPABASE_ANON_KEY = 'sb_publishable_RoqpRQpprvMi-fSx9S7Nxw_w1Vh7wMS';               // 👈 替换为你的 anon/public key
+    // ========== Supabase 配置 ==========
+    const SUPABASE_URL = 'https://lvfucusklimtbrdephqj.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_RoqpRQpprvMi-fSx9S7Nxw_w1Vh7wMS';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // ========== 全局状态 ==========
@@ -924,86 +925,96 @@
     // ========== 云端数据操作 ==========
     async function loadAllData() {
         showToast("加载数据中...", "#3c7a5a");
-        const { data: monsters, error: mErr } = await supabase.from('monsters').select('*').order('id');
-        if (mErr) { console.error(mErr); showToast("加载失败", "#ffb3a0"); return false; }
-        if (!monsters || monsters.length === 0) {
+        try {
+            const { data: monsters, error: mErr } = await supabase.from('monsters').select('*').order('id');
+            if (mErr) throw mErr;
+            monstersBase = monsters || [];
+            const { data: tests, error: tErr } = await supabase.from('monster_test_states').select('*');
+            if (tErr) throw tErr;
+            monsterTestStates = {};
+            if (tests) {
+                tests.forEach(t => {
+                    if (!monsterTestStates[t.monster_id]) monsterTestStates[t.monster_id] = {};
+                    monsterTestStates[t.monster_id][t.test_key] = t.test_value || "";
+                });
+            }
+            const { data: notes, error: nErr } = await supabase.from('monster_notes').select('*');
+            if (nErr) throw nErr;
+            monsterNotes = {};
+            if (notes) notes.forEach(n => { monsterNotes[n.monster_id] = n.note_text || ""; });
+            // 确保每个怪物都有完整状态
+            for (let m of monstersBase) {
+                if (!monsterTestStates[m.id]) monsterTestStates[m.id] = {};
+                for (let t of testCategories) if (monsterTestStates[m.id][t.key] === undefined) monsterTestStates[m.id][t.key] = "";
+                if (monsterNotes[m.id] === undefined) monsterNotes[m.id] = "";
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("加载数据失败，请刷新页面重试", "#ffb3a0");
             monstersBase = [];
             monsterTestStates = {};
             monsterNotes = {};
-            return true;
         }
-        monstersBase = monsters.map(m => ({
-            ...m,
-            rank: m.rank,
-            imageData: m.image_data,
-            baseHp: m.base_hp,
-            baseAtk: m.base_atk,
-            baseArmor: m.base_armor,
-            isChanged: m.is_changed
-        }));
-        const { data: tests, error: tErr } = await supabase.from('monster_test_states').select('*');
-        if (!tErr && tests) {
-            monsterTestStates = {};
-            tests.forEach(t => { if(!monsterTestStates[t.monster_id]) monsterTestStates[t.monster_id]={}; monsterTestStates[t.monster_id][t.test_key]=t.test_value||""; });
-        }
-        const { data: notes, error: nErr } = await supabase.from('monster_notes').select('*');
-        if (!nErr && notes) {
-            monsterNotes = {};
-            notes.forEach(n => { monsterNotes[n.monster_id]=n.note_text||""; });
-        }
-        for(let m of monstersBase) {
-            if(!monsterTestStates[m.id]) monsterTestStates[m.id]={};
-            for(let t of testCategories) if(monsterTestStates[m.id][t.key]===undefined) monsterTestStates[m.id][t.key]="";
-            if(monsterNotes[m.id]===undefined) monsterNotes[m.id]="";
-        }
-        return true;
     }
 
-    async function saveAllData() {
-        // 保存怪物
-        for(let monster of monstersBase) {
-            const { error } = await supabase.from('monsters').upsert({
-                id: monster.id,
-                name: monster.name,
-                type: monster.type,
-                rank: monster.rank,
-                base_hp: monster.baseHp,
-                base_atk: monster.baseAtk,
-                base_armor: monster.baseArmor,
-                is_changed: monster.isChanged,
-                image_data: monster.imageData
-            }, { onConflict: 'id' });
-            if(error) console.error(error);
-        }
-        // 保存测试状态
-        for(let mid in monsterTestStates) {
-            for(let t of testCategories) {
-                await supabase.from('monster_test_states').upsert({
-                    monster_id: parseInt(mid),
-                    test_key: t.key,
-                    test_value: monsterTestStates[mid][t.key] || ""
-                }, { onConflict: 'monster_id, test_key' });
+    async function syncAllData() {
+        showToast("同步中...", "#3c7a5a");
+        try {
+            // 同步怪物
+            for (let monster of monstersBase) {
+                const { error } = await supabase.from('monsters').upsert({
+                    id: monster.id,
+                    name: monster.name,
+                    type: monster.type,
+                    rank: monster.rank,
+                    base_hp: monster.baseHp,
+                    base_atk: monster.baseAtk,
+                    base_armor: monster.baseArmor,
+                    is_changed: monster.isChanged,
+                    image_data: monster.imageData
+                }, { onConflict: 'id' });
+                if (error) throw error;
             }
+            // 同步测试状态
+            for (let mid in monsterTestStates) {
+                for (let t of testCategories) {
+                    const { error } = await supabase.from('monster_test_states').upsert({
+                        monster_id: parseInt(mid),
+                        test_key: t.key,
+                        test_value: monsterTestStates[mid][t.key] || ""
+                    }, { onConflict: 'monster_id, test_key' });
+                    if (error) throw error;
+                }
+            }
+            // 同步备注
+            for (let mid in monsterNotes) {
+                const { error } = await supabase.from('monster_notes').upsert({
+                    monster_id: parseInt(mid),
+                    note_text: monsterNotes[mid] || "",
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'monster_id' });
+                if (error) throw error;
+            }
+            showToast("✨ 已同步到云端", "#3c7a5a");
+        } catch (err) {
+            console.error(err);
+            showToast("同步失败，请检查网络", "#ffb3a0");
         }
-        // 保存备注
-        for(let mid in monsterNotes) {
-            await supabase.from('monster_notes').upsert({
-                monster_id: parseInt(mid),
-                note_text: monsterNotes[mid] || "",
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'monster_id' });
-        }
-        showToast("✨ 已同步到云端", "#3c7a5a");
     }
 
-    // 删除怪物（同时级联删除测试状态和备注，由数据库外键处理）
     async function deleteMonsters(ids) {
-        const { error } = await supabase.from('monsters').delete().in('id', ids);
-        if (error) { console.error(error); showToast("删除失败", "#ffb3a0"); return false; }
-        return true;
+        try {
+            const { error } = await supabase.from('monsters').delete().in('id', ids);
+            if (error) throw error;
+            return true;
+        } catch (err) {
+            console.error(err);
+            showToast("删除失败", "#ffb3a0");
+            return false;
+        }
     }
 
-    // ========== UI 渲染逻辑（与之前版本一致） ==========
+    // ========== UI 渲染逻辑（与本地版本一致，但调用 syncAllData 替代 saveAllData）==========
     function sortMonsters(list) {
         const order = { "minion":1, "elite":2, "boss":3 };
         return [...list].sort((a,b)=>{
@@ -1162,7 +1173,7 @@
             sel.addEventListener('change', async (e) => {
                 monsterTestStates[mid][testKey] = e.target.value;
                 applySelectStyle(sel, e.target.value);
-                await saveAllData();
+                await syncAllData();
                 showToast(`✅ 已更新 ${testCategories.find(t=>t.key===testKey)?.label}`, "#c2e0b5");
             });
         });
@@ -1180,7 +1191,7 @@
                 const textarea = document.getElementById(`note-${monster.id}`);
                 if (textarea) {
                     monsterNotes[monster.id] = textarea.value;
-                    await saveAllData();
+                    await syncAllData();
                     showToast("📝 备注已保存", "#3c7a5a");
                 }
             });
@@ -1247,7 +1258,7 @@
                 monster.imageData = imgData;
                 monster.image = "";
             }
-            await saveAllData();
+            await syncAllData();
             renderGrid();
             if (currentExpandedId === id) {
                 const card = document.querySelector(`.monster-card[data-id="${id}"]`);
@@ -1287,7 +1298,7 @@
             monsterTestStates[id] = {};
             for (let t of testCategories) monsterTestStates[id][t.key] = "";
             monsterNotes[id] = "";
-            await saveAllData();
+            await syncAllData();
             updateCounts();
             renderGrid();
             showToast(`✨ 添加 ${name} 成功`, "#9bc48f");
@@ -1357,7 +1368,7 @@
                     for (let t of testCategories) monsterTestStates[m.id][t.key] = "";
                     monsterNotes[m.id] = "";
                 }
-                await saveAllData();
+                await syncAllData();
                 updateCounts();
                 renderGrid();
                 closeDetail();
@@ -1441,7 +1452,7 @@
         document.getElementById('cancelAddBtn').addEventListener('click', () => document.getElementById('addModal').style.display = 'none');
         document.getElementById('addForm').addEventListener('submit', addMonster);
         document.getElementById('deleteSelectedBtn').addEventListener('click', deleteSelected);
-        document.getElementById('manualSaveBtn').addEventListener('click', saveAllData);
+        document.getElementById('manualSaveBtn').addEventListener('click', syncAllData);
         document.getElementById('themeToggle').addEventListener('click', () => {
             const cur = document.documentElement.getAttribute('data-theme');
             setTheme(cur === 'light' ? 'dark' : 'light');
