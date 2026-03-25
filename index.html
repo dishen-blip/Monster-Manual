@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>怪物图鉴 · 云端共享版</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         /* ========== 样式代码（与用户提供的本地版本完全一致） ========== */
@@ -1014,7 +1014,7 @@
         }
     }
 
-    // ========== UI 渲染逻辑（与本地版本一致，但调用 syncAllData 替代 saveAllData）==========
+    // ========== UI 渲染逻辑 ==========
     function sortMonsters(list) {
         const order = { "minion":1, "elite":2, "boss":3 };
         return [...list].sort((a,b)=>{
