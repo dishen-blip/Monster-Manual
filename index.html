@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* 样式与之前完全一致，为节省篇幅，此处省略（实际使用时需保留完整样式） */
+        /* 样式代码与之前完全一致，为节省篇幅，此处省略（实际使用时需保留完整样式） */
         * {
             margin: 0;
             padding: 0;
@@ -884,64 +884,59 @@
     }
     function getRankText(r) { return rankTextMap[r]; }
 
-    // ========== 云端数据操作（带详细日志） ==========
-    async function loadAllData() {
-        showToast("加载数据中...", "#3c7a5a");
-        console.log("开始加载数据...");
+    // ========== 单条保存（即时） ==========
+    async function saveSingleTestState(monsterId, testKey, value) {
+        console.log(`即时保存测试状态: monster_id=${monsterId}, test_key=${testKey}, value=${value}`);
         try {
-            const { data: monsters, error: mErr } = await supabaseClient.from('monsters').select('*').order('id');
-            if (mErr) throw mErr;
-            monstersBase = monsters || [];
-            monstersBase = monstersBase.map(m => ({
-                ...m,
-                baseHp: m.base_hp,
-                baseAtk: m.base_atk,
-                baseArmor: m.base_armor,
-                imageData: m.image_data,
-                isChanged: m.is_changed,
-                rank: m.rank,
-                type: m.type,
-                name: m.name,
-                id: m.id,
-                image: m.image_data ? "" : m.id.toString()
-            }));
-            const { data: tests, error: tErr } = await supabaseClient.from('monster_test_states').select('*');
-            if (tErr) throw tErr;
-            monsterTestStates = {};
-            if (tests) {
-                tests.forEach(t => {
-                    if (!monsterTestStates[t.monster_id]) monsterTestStates[t.monster_id] = {};
-                    monsterTestStates[t.monster_id][t.test_key] = t.test_value || "";
-                });
+            const { error } = await supabaseClient.from('monster_test_states').upsert({
+                monster_id: monsterId,
+                test_key: testKey,
+                test_value: value
+            }, { onConflict: 'monster_id, test_key' });
+            if (error) {
+                console.error("即时保存测试状态失败：", error);
+                showToast(`保存失败：${error.message}`, "#ffb3a0");
+                return false;
             }
-            const { data: notes, error: nErr } = await supabaseClient.from('monster_notes').select('*');
-            if (nErr) throw nErr;
-            monsterNotes = {};
-            if (notes) notes.forEach(n => { monsterNotes[n.monster_id] = n.note_text || ""; });
-            for (let m of monstersBase) {
-                if (!monsterTestStates[m.id]) monsterTestStates[m.id] = {};
-                for (let t of testCategories) if (monsterTestStates[m.id][t.key] === undefined) monsterTestStates[m.id][t.key] = "";
-                if (monsterNotes[m.id] === undefined) monsterNotes[m.id] = "";
-            }
-            console.log("加载完成，怪物数量：", monstersBase.length);
-            console.log("测试状态：", monsterTestStates);
+            showToast(`✅ 已保存 ${testCategories.find(t=>t.key===testKey)?.label}`, "#c2e0b5");
+            return true;
         } catch (err) {
-            console.error("加载数据失败：", err);
-            showToast("加载数据失败，请刷新页面重试", "#ffb3a0");
-            monstersBase = [];
-            monsterTestStates = {};
-            monsterNotes = {};
+            console.error("即时保存异常：", err);
+            showToast(`保存异常：${err.message}`, "#ffb3a0");
+            return false;
         }
     }
 
+    async function saveSingleNote(monsterId, noteText) {
+        console.log(`即时保存备注: monster_id=${monsterId}, note=${noteText}`);
+        try {
+            const { error } = await supabaseClient.from('monster_notes').upsert({
+                monster_id: monsterId,
+                note_text: noteText,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'monster_id' });
+            if (error) {
+                console.error("即时保存备注失败：", error);
+                showToast(`保存失败：${error.message}`, "#ffb3a0");
+                return false;
+            }
+            showToast("💾 备注已保存", "#3c7a5a");
+            return true;
+        } catch (err) {
+            console.error("即时保存异常：", err);
+            showToast(`保存异常：${err.message}`, "#ffb3a0");
+            return false;
+        }
+    }
+
+    // ========== 全量保存（备用，由“保存”按钮触发） ==========
     async function syncAllData() {
-        console.log("========== syncAllData 开始 ==========");
+        console.log("全量保存开始...");
         showToast("同步中...", "#3c7a5a");
         let hasError = false;
         try {
-            // 1. 先确保所有怪物都存在
+            // 1. 保存怪物
             for (let monster of monstersBase) {
-                console.log(`准备保存怪物 ID=${monster.id}, 名称=${monster.name}`);
                 const { error } = await supabaseClient.from('monsters').upsert({
                     id: monster.id,
                     name: monster.name,
@@ -953,62 +948,37 @@
                     is_changed: monster.isChanged,
                     image_data: monster.imageData
                 }, { onConflict: 'id' });
-                if (error) {
-                    console.error(`怪物 ${monster.id} 保存失败：`, error);
-                    showToast(`怪物 ${monster.id} 保存失败：${error.message}`, "#ffb3a0");
-                    hasError = true;
-                } else {
-                    console.log(`怪物 ${monster.id} 保存成功`);
-                }
+                if (error) throw error;
             }
-
             // 2. 保存测试状态
-            console.log("开始保存测试状态...");
             for (let mid in monsterTestStates) {
-                console.log(`处理怪物 ID=${mid} 的测试状态`);
                 for (let t of testCategories) {
                     const value = monsterTestStates[mid][t.key] || "";
-                    console.log(`  保存测试状态: monster_id=${mid}, test_key=${t.key}, value=${value}`);
                     const { error } = await supabaseClient.from('monster_test_states').upsert({
                         monster_id: parseInt(mid),
                         test_key: t.key,
                         test_value: value
                     }, { onConflict: 'monster_id, test_key' });
-                    if (error) {
-                        console.error(`测试状态保存失败 (怪物 ${mid}, ${t.key}):`, error);
-                        showToast(`测试状态保存失败：${error.message}`, "#ffb3a0");
-                        hasError = true;
-                    }
+                    if (error) throw error;
                 }
             }
-
             // 3. 保存备注
-            console.log("开始保存备注...");
             for (let mid in monsterNotes) {
                 const note = monsterNotes[mid] || "";
-                console.log(`保存备注: monster_id=${mid}, note=${note}`);
                 const { error } = await supabaseClient.from('monster_notes').upsert({
                     monster_id: parseInt(mid),
                     note_text: note,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'monster_id' });
-                if (error) {
-                    console.error(`备注保存失败 (怪物 ${mid}):`, error);
-                    showToast(`备注保存失败：${error.message}`, "#ffb3a0");
-                    hasError = true;
-                }
+                if (error) throw error;
             }
-
-            if (!hasError) {
-                showToast("✨ 所有数据已同步到云端", "#3c7a5a");
-            } else {
-                showToast("部分数据同步失败，请查看控制台", "#ffb3a0");
-            }
-            console.log("========== syncAllData 结束 ==========");
+            showToast("✨ 所有数据已同步到云端", "#3c7a5a");
         } catch (err) {
-            console.error("syncAllData 整体错误：", err);
-            showToast(`同步失败：${err.message}，请查看控制台`, "#ffb3a0");
+            console.error("全量保存失败：", err);
+            showToast(`全量保存失败：${err.message}`, "#ffb3a0");
+            hasError = true;
         }
+        return !hasError;
     }
 
     async function deleteMonsters(ids) {
@@ -1108,7 +1078,7 @@
         reader.readAsArrayBuffer(file);
     }
 
-    // ========== UI 渲染逻辑（与之前一致） ==========
+    // ========== UI 渲染逻辑 ==========
     function sortMonsters(list) {
         const order = { "minion":1, "elite":2, "boss":3 };
         return [...list].sort((a,b)=>{
@@ -1269,9 +1239,10 @@
                 <button class="edit-btn" id="detailEditBtn">✏️ 编辑</button>
                 <button class="close-btn" id="detailCloseBtn">✖ 收起</button>
             </div>
-            <div class="info-note">点击编辑可修改怪物数据 | 保存按钮同步所有修改</div>
+            <div class="info-note">点击编辑可修改怪物数据 | 修改后自动保存</div>
         `;
 
+        // 测试状态下拉即时保存
         container.querySelectorAll('.status-select').forEach(sel => {
             const testKey = sel.getAttribute('data-test');
             const mid = parseInt(sel.getAttribute('data-mid'));
@@ -1281,19 +1252,19 @@
                 const newValue = e.target.value;
                 monsterTestStates[mid][testKey] = newValue;
                 applySelectStyle(sel, newValue);
-                await syncAllData();
-                showToast(`✅ 已更新 ${testCategories.find(t=>t.key===testKey)?.label}`, "#c2e0b5");
+                await saveSingleTestState(mid, testKey, newValue);
             });
         });
 
+        // 备注保存按钮
         const noteSaveBtn = container.querySelector('.note-save-btn');
         if (noteSaveBtn) {
             noteSaveBtn.addEventListener('click', async () => {
                 const textarea = document.getElementById(`note-${monster.id}`);
                 if (textarea) {
-                    monsterNotes[monster.id] = textarea.value;
-                    await syncAllData();
-                    showToast("💾 数据已保存", "#3c7a5a");
+                    const newNote = textarea.value;
+                    monsterNotes[monster.id] = newNote;
+                    await saveSingleNote(monster.id, newNote);
                 }
             });
         }
@@ -1359,7 +1330,19 @@
                 monster.imageData = imgData;
                 monster.image = "";
             }
-            await syncAllData();
+            // 保存该怪物
+            const { error } = await supabaseClient.from('monsters').upsert({
+                id: monster.id,
+                name: monster.name,
+                type: monster.type,
+                rank: monster.rank,
+                base_hp: monster.baseHp,
+                base_atk: monster.baseAtk,
+                base_armor: monster.baseArmor,
+                is_changed: monster.isChanged,
+                image_data: monster.imageData
+            }, { onConflict: 'id' });
+            if (error) throw error;
             renderGrid();
             if (currentExpandedId === id) {
                 const card = document.querySelector(`.monster-card[data-id="${id}"]`);
@@ -1401,7 +1384,7 @@
             monsterTestStates[id] = {};
             for (let t of testCategories) monsterTestStates[id][t.key] = "";
             monsterNotes[id] = "";
-            await syncAllData();
+            await syncAllData();  // 添加怪物后全量同步一次（确保所有关联表初始化）
             updateCounts();
             renderGrid();
             showToast(`✨ 添加 ${name} 成功`, "#9bc48f");
@@ -1524,6 +1507,52 @@
         });
         document.getElementById('cancelEditBtn').addEventListener('click', closeEditModal);
         document.getElementById('editForm').addEventListener('submit', saveEditMonster);
+    }
+
+    async function loadAllData() {
+        showToast("加载数据中...", "#3c7a5a");
+        try {
+            const { data: monsters, error: mErr } = await supabaseClient.from('monsters').select('*').order('id');
+            if (mErr) throw mErr;
+            monstersBase = monsters || [];
+            monstersBase = monstersBase.map(m => ({
+                ...m,
+                baseHp: m.base_hp,
+                baseAtk: m.base_atk,
+                baseArmor: m.base_armor,
+                imageData: m.image_data,
+                isChanged: m.is_changed,
+                rank: m.rank,
+                type: m.type,
+                name: m.name,
+                id: m.id,
+                image: m.image_data ? "" : m.id.toString()
+            }));
+            const { data: tests, error: tErr } = await supabaseClient.from('monster_test_states').select('*');
+            if (tErr) throw tErr;
+            monsterTestStates = {};
+            if (tests) {
+                tests.forEach(t => {
+                    if (!monsterTestStates[t.monster_id]) monsterTestStates[t.monster_id] = {};
+                    monsterTestStates[t.monster_id][t.test_key] = t.test_value || "";
+                });
+            }
+            const { data: notes, error: nErr } = await supabaseClient.from('monster_notes').select('*');
+            if (nErr) throw nErr;
+            monsterNotes = {};
+            if (notes) notes.forEach(n => { monsterNotes[n.monster_id] = n.note_text || ""; });
+            for (let m of monstersBase) {
+                if (!monsterTestStates[m.id]) monsterTestStates[m.id] = {};
+                for (let t of testCategories) if (monsterTestStates[m.id][t.key] === undefined) monsterTestStates[m.id][t.key] = "";
+                if (monsterNotes[m.id] === undefined) monsterNotes[m.id] = "";
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("加载数据失败，请刷新页面重试", "#ffb3a0");
+            monstersBase = [];
+            monsterTestStates = {};
+            monsterNotes = {};
+        }
     }
 
     async function init() {
