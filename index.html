@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* 样式与上一版本完全相同，此处省略以节省篇幅，实际使用请保留完整样式 */
+        /* ========== 完整样式（与之前版本一致，无改动） ========== */
         * {
             margin: 0;
             padding: 0;
@@ -1029,60 +1029,58 @@
     }
 
     async function syncAllData() {
-    showToast("同步中...", "#3c7a5a");
-    try {
-        // 1. 保存 monsters
-        for (let monster of monstersBase) {
-            const { error } = await supabaseClient.from('monsters').upsert({
-                id: monster.id,
-                name: monster.name,
-                type: monster.type,
-                rank: monster.rank,
-                base_hp: monster.baseHp,
-                base_atk: monster.baseAtk,
-                base_armor: monster.baseArmor,
-                is_changed: monster.isChanged,
-                image_data: monster.imageData
-            }, { onConflict: 'id' });
-            if (error) throw error;
-        }
+        showToast("同步中...", "#3c7a5a");
+        try {
+            // 1. 保存 monsters
+            for (let monster of monstersBase) {
+                const { error } = await supabaseClient.from('monsters').upsert({
+                    id: monster.id,
+                    name: monster.name,
+                    type: monster.type,
+                    rank: monster.rank,
+                    base_hp: monster.baseHp,
+                    base_atk: monster.baseAtk,
+                    base_armor: monster.baseArmor,
+                    is_changed: monster.isChanged,
+                    image_data: monster.imageData
+                }, { onConflict: 'id' });
+                if (error) throw error;
+            }
 
-        // 2. 保存测试状态
-        for (let mid in monsterTestStates) {
-            for (let t of testCategories) {
-                const { error } = await supabaseClient.from('monster_test_states').upsert({
+            // 2. 保存测试状态
+            for (let mid in monsterTestStates) {
+                for (let t of testCategories) {
+                    const { error } = await supabaseClient.from('monster_test_states').upsert({
+                        monster_id: parseInt(mid),
+                        test_key: t.key,
+                        test_value: monsterTestStates[mid][t.key] || ""
+                    }, { onConflict: 'monster_id, test_key' });
+                    if (error) {
+                        console.error("测试状态保存失败：", error);
+                        showToast(`保存测试状态失败：${error.message}`, "#ffb3a0");
+                        throw error;
+                    }
+                }
+            }
+
+            // 3. 保存备注
+            for (let mid in monsterNotes) {
+                const { error } = await supabaseClient.from('monster_notes').upsert({
                     monster_id: parseInt(mid),
-                    test_key: t.key,
-                    test_value: monsterTestStates[mid][t.key] || ""
-                }, { onConflict: 'monster_id, test_key' });
+                    note_text: monsterNotes[mid] || "",
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'monster_id' });
                 if (error) {
-                    console.error("测试状态保存失败：", error);
-                    showToast(`保存测试状态失败：${error.message}`, "#ffb3a0");
+                    console.error("备注保存失败：", error);
+                    showToast(`保存备注失败：${error.message}`, "#ffb3a0");
                     throw error;
                 }
             }
-        }
 
-        // 3. 保存备注
-        for (let mid in monsterNotes) {
-            const { error } = await supabaseClient.from('monster_notes').upsert({
-                monster_id: parseInt(mid),
-                note_text: monsterNotes[mid] || "",
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'monster_id' });
-            if (error) {
-                console.error("备注保存失败：", error);
-                showToast(`保存备注失败：${error.message}`, "#ffb3a0");
-                throw error;
-            }
-        }
-
-        showToast("✨ 已同步到云端", "#3c7a5a");
-    } catch (err) {
-        console.error("syncAllData 整体错误：", err);
-        showToast(`同步失败：${err.message}，请检查控制台`, "#ffb3a0");
-    }
-}
+            showToast("✨ 已同步到云端", "#3c7a5a");
+        } catch (err) {
+            console.error("syncAllData 整体错误：", err);
+            showToast(`同步失败：${err.message}，请检查控制台`, "#ffb3a0");
         }
     }
 
