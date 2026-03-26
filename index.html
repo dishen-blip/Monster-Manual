@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* 样式代码与之前完全一致，为节省篇幅，此处省略（实际使用时需保留完整样式） */
+        /* 所有样式与之前一致，仅增加 .confirm-modal 的视觉加强 */
         * {
             margin: 0;
             padding: 0;
@@ -632,9 +632,17 @@
             color: var(--text-primary);
             border: 1px solid var(--border);
         }
+        /* 强化确认按钮样式，使其在任何主题下都醒目 */
         .confirm-modal {
             background: var(--btn-gradient);
             color: var(--badge-text);
+            border: 1px solid var(--accent);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        .confirm-modal:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.05);
+            box-shadow: 0 4px 10px var(--accent)80;
         }
 
         .progress-modal {
@@ -1363,13 +1371,19 @@
         }
     }
 
-    // ========== 添加怪物 ==========
+    // ========== 添加怪物（修复版） ==========
     async function addMonster(e) {
         e.preventDefault();
         const id = parseInt(document.getElementById('newId').value);
-        if (isNaN(id) || monstersBase.some(m => m.id === id)) { showToast("ID无效或重复", "#ffb3a0"); return; }
+        if (isNaN(id) || monstersBase.some(m => m.id === id)) {
+            showToast("ID无效或重复", "#ffb3a0");
+            return;
+        }
         const name = document.getElementById('newName').value.trim();
-        if (!name) { showToast("名称不能为空", "#ffb3a0"); return; }
+        if (!name) {
+            showToast("名称不能为空", "#ffb3a0");
+            return;
+        }
         const rank = parseRank(document.getElementById('newRank').value);
         let type = document.getElementById('newType').value.trim();
         if (!type) type = "未知";
@@ -1379,17 +1393,68 @@
         const isChanged = document.getElementById('newIsChanged').checked;
         const imgFile = document.getElementById('newImage').files[0];
         const finish = async (imgData) => {
-            const newMonster = { id, name, type, rank, baseHp: hp, baseAtk: atk, baseArmor: armor, isChanged, image: imgData ? "" : id.toString(), imageData: imgData || null };
+            const newMonster = {
+                id,
+                name,
+                type,
+                rank,
+                baseHp: hp,
+                baseAtk: atk,
+                baseArmor: armor,
+                isChanged,
+                image: imgData ? "" : id.toString(),
+                imageData: imgData || null
+            };
             monstersBase.push(newMonster);
+            // 初始化测试状态和备注
             monsterTestStates[id] = {};
             for (let t of testCategories) monsterTestStates[id][t.key] = "";
             monsterNotes[id] = "";
-            await syncAllData();  // 添加怪物后全量同步一次（确保所有关联表初始化）
-            updateCounts();
-            renderGrid();
-            showToast(`✨ 添加 ${name} 成功`, "#9bc48f");
-            document.getElementById('addModal').style.display = 'none';
-            document.getElementById('addForm').reset();
+            // 保存到云端
+            try {
+                // 先插入怪物
+                const { error: insertErr } = await supabaseClient.from('monsters').insert({
+                    id: newMonster.id,
+                    name: newMonster.name,
+                    type: newMonster.type,
+                    rank: newMonster.rank,
+                    base_hp: newMonster.baseHp,
+                    base_atk: newMonster.baseAtk,
+                    base_armor: newMonster.baseArmor,
+                    is_changed: newMonster.isChanged,
+                    image_data: newMonster.imageData
+                });
+                if (insertErr) throw insertErr;
+                // 插入测试状态（初始为空）
+                for (let t of testCategories) {
+                    await supabaseClient.from('monster_test_states').insert({
+                        monster_id: newMonster.id,
+                        test_key: t.key,
+                        test_value: ""
+                    });
+                }
+                // 插入备注（初始为空）
+                await supabaseClient.from('monster_notes').insert({
+                    monster_id: newMonster.id,
+                    note_text: ""
+                });
+                // 更新计数和网格
+                updateCounts();
+                renderGrid();
+                // 关闭模态框并清空表单
+                document.getElementById('addModal').style.display = 'none';
+                document.getElementById('addForm').reset();
+                showToast(`✨ 添加 ${name} 成功`, "#9bc48f");
+                // 可选：自动打开新怪物的详情（提升体验）
+                // 刷新网格后，新怪物已在列表中，点击即可查看
+            } catch (err) {
+                console.error("添加怪物失败：", err);
+                showToast(`添加失败：${err.message}`, "#ffb3a0");
+                // 回滚本地数据
+                monstersBase.pop();
+                delete monsterTestStates[id];
+                delete monsterNotes[id];
+            }
         };
         if (imgFile) {
             const r = new FileReader();
