@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* 所有样式与之前一致，仅增加 .confirm-modal 的视觉加强 */
+        /* 所有样式与之前一致，仅修改 .confirm-modal 样式以增强对比度 */
         * {
             margin: 0;
             padding: 0;
@@ -634,15 +634,20 @@
         }
         /* 强化确认按钮样式，使其在任何主题下都醒目 */
         .confirm-modal {
-            background: var(--btn-gradient);
-            color: var(--badge-text);
-            border: 1px solid var(--accent);
+            background: linear-gradient(135deg, #4a8c4a, #2c6e2c);
+            color: white;
+            border: 1px solid #4a8c4a;
             box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            text-shadow: 0 1px 1px rgba(0,0,0,0.2);
         }
         .confirm-modal:hover {
             transform: translateY(-2px);
             filter: brightness(1.05);
-            box-shadow: 0 4px 10px var(--accent)80;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        [data-theme="light"] .confirm-modal {
+            background: linear-gradient(135deg, #2c6e4a, #1e5a3a);
+            border-color: #1e5a3a;
         }
 
         .progress-modal {
@@ -876,6 +881,12 @@
             }
         }
         return null;
+    }
+
+    // 定义 parseArmor 函数（修复错误）
+    function parseArmor(value) {
+        let num = parseFloat(value);
+        return isNaN(num) ? 100 : num;
     }
 
     function getDynamicStats(monster) {
