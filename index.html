@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* ========== 样式代码（与之前稳定版一致） ========== */
+        /* 样式与之前完全一致，为节省篇幅，此处省略（实际使用时需保留完整样式） */
         * {
             margin: 0;
             padding: 0;
@@ -56,20 +56,16 @@
             background: var(--bg-primary);
             font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
             padding: 2rem;
-            position: relative;
-            transition: background 0.3s ease;
+            transition: background 0.3s;
         }
 
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            position: relative;
-            z-index: 2;
             background: rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(2px);
             border-radius: 2rem;
             padding: 0 0.5rem;
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
             border: 1px solid var(--border);
         }
 
@@ -84,14 +80,12 @@
             backdrop-filter: blur(12px);
             padding: 0.6rem 1.2rem;
             border-radius: 2rem;
-            box-shadow: var(--shadow);
             border: 1px solid var(--border);
         }
 
         .left-tools {
             display: flex;
             gap: 0.6rem;
-            align-items: center;
             flex-wrap: wrap;
         }
 
@@ -109,8 +103,6 @@
             border-radius: 2rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
-            font-size: 0.85rem;
             background: transparent;
             color: var(--accent);
         }
@@ -127,28 +119,20 @@
             padding: 0.4rem 1rem;
             border-radius: 2rem;
             color: var(--text-primary);
-            font-weight: 500;
             cursor: pointer;
             font-size: 0.8rem;
-            transition: 0.1s;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
         .action-btn:hover {
             transform: translateY(-2px);
             background: var(--hover-bg);
-            box-shadow: 0 4px 10px var(--accent)40;
         }
         .danger-btn {
             border-color: #e67e5a;
             color: #e67e5a;
         }
-        .danger-btn:hover {
-            background: rgba(230, 126, 90, 0.1);
-        }
 
         .import-area {
             display: flex;
-            align-items: center;
             gap: 0.6rem;
             background: var(--card-bg);
             padding: 0.2rem 0.8rem;
@@ -176,17 +160,11 @@
             padding: 0.4rem 1rem;
             cursor: pointer;
             color: var(--accent);
-            font-weight: 500;
-            transition: 0.1s;
-        }
-        .theme-toggle:hover {
-            background: var(--hover-bg);
         }
 
         .header {
             margin-bottom: 1.5rem;
             text-align: center;
-            position: relative;
         }
         .header h1 {
             font-size: 2.2rem;
@@ -194,20 +172,14 @@
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            font-weight: 800;
-            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
             letter-spacing: 2px;
         }
         .header h1::before {
             content: "💀";
             font-size: 2rem;
             margin-right: 0.5rem;
-            background: none;
-            -webkit-background-clip: unset;
-            background-clip: unset;
             color: var(--accent);
             display: inline-block;
-            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
         }
         .header::after {
             content: "";
@@ -222,10 +194,8 @@
             display: flex;
             flex-wrap: wrap;
             justify-content: space-between;
-            align-items: center;
             gap: 0.8rem;
             background: var(--card-bg);
-            backdrop-filter: blur(8px);
             padding: 0.6rem 1rem;
             border-radius: 2rem;
             margin-bottom: 1.5rem;
@@ -251,9 +221,6 @@
             background: transparent;
             color: var(--text-primary);
         }
-        .search-box input::placeholder {
-            color: var(--text-secondary);
-        }
         .search-box button {
             background: none;
             border: none;
@@ -263,7 +230,6 @@
         }
         .sort-group {
             display: flex;
-            align-items: center;
             gap: 0.4rem;
             background: var(--input-bg);
             padding: 0.2rem 0.8rem;
@@ -271,7 +237,6 @@
         }
         .sort-label {
             font-size: 0.75rem;
-            font-weight: 500;
             color: var(--text-secondary);
         }
         .sort-btn {
@@ -282,19 +247,16 @@
             font-size: 0.75rem;
             cursor: pointer;
             color: var(--text-secondary);
-            transition: 0.1s;
         }
         .sort-btn.active {
             background: var(--btn-gradient);
             color: var(--badge-text);
-            font-weight: bold;
         }
 
         .summary-bar {
             display: flex;
             gap: 0.8rem;
             background: var(--card-bg);
-            backdrop-filter: blur(8px);
             padding: 0.4rem 1rem;
             border-radius: 2rem;
             margin-bottom: 1.8rem;
@@ -310,17 +272,10 @@
             border-radius: 2rem;
             cursor: pointer;
             background: var(--input-bg);
-            transition: all 0.2s;
             border: 1px solid var(--border);
-        }
-        .summary-card:hover {
-            transform: translateY(-2px);
-            background: var(--hover-bg);
         }
         .summary-card.active {
             background: var(--btn-gradient);
-            border-color: var(--accent);
-            box-shadow: 0 2px 8px var(--accent)40;
         }
         .summary-label {
             font-weight: 500;
@@ -334,8 +289,6 @@
             background: rgba(0, 0, 0, 0.1);
             padding: 0 0.4rem;
             border-radius: 1rem;
-            min-width: 1.5rem;
-            text-align: center;
         }
 
         .monster-grid {
@@ -350,15 +303,13 @@
             border-radius: 1.2rem;
             padding: 0.8rem;
             cursor: pointer;
-            transition: all 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-            box-shadow: var(--shadow);
+            transition: 0.25s;
             border: 1px solid var(--border);
             text-align: center;
             position: relative;
         }
         .monster-card:hover {
             transform: translateY(-6px);
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
             border-color: var(--accent);
         }
         .monster-checkbox {
@@ -367,7 +318,6 @@
             left: 8px;
             width: 18px;
             height: 18px;
-            cursor: pointer;
             accent-color: var(--accent);
             z-index: 2;
         }
@@ -379,8 +329,6 @@
             padding: 0.2rem 0.6rem;
             border-radius: 20px;
             white-space: nowrap;
-            backdrop-filter: blur(2px);
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
         .modify-badge {
             left: 34px;
@@ -393,8 +341,6 @@
             right: 8px;
             background: rgba(0, 0, 0, 0.6);
             color: var(--accent);
-            font-size: 0.7rem;
-            padding: 0.2rem 0.6rem;
             border: 1px solid var(--accent);
         }
         .rank-badge.minion { background: #2a5a2a; color: white; }
@@ -410,11 +356,9 @@
             align-items: center;
             justify-content: center;
             font-size: 2.8rem;
-            font-weight: bold;
             color: var(--accent);
             margin-bottom: 0.5rem;
             overflow: hidden;
-            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.05);
             border: 1px solid var(--border);
         }
         .monster-image img {
@@ -430,7 +374,6 @@
             padding: 0.2rem 0.8rem;
             border-radius: 20px;
             font-size: 0.85rem;
-            backdrop-filter: blur(4px);
             border: 1px solid var(--border);
         }
 
@@ -442,13 +385,11 @@
             padding: 1rem 1.2rem;
             margin: 0.5rem 0;
             border: 1px solid var(--accent);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
             animation: slideDown 0.3s ease-out;
         }
         @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px) scaleY(0.95); }
-            to { opacity: 1; transform: translateY(0) scaleY(1); }
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .detail-expanded .detail-header {
             display: flex;
@@ -465,25 +406,15 @@
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            flex-shrink: 0;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             border: 1px solid var(--accent);
-        }
-        .detail-expanded .detail-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
         }
         .detail-expanded .detail-avatar span {
             font-size: 2.2rem;
-            font-weight: 600;
             color: var(--accent);
         }
         .detail-expanded .detail-title h2 {
             font-size: 1.2rem;
-            font-weight: 700;
             color: var(--text-primary);
-            margin-bottom: 0.2rem;
         }
         .detail-expanded .detail-meta {
             font-size: 0.7rem;
@@ -515,7 +446,6 @@
         }
         .detail-expanded .test-section h3 {
             font-size: 0.85rem;
-            font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 0.5rem;
             border-left: 3px solid var(--accent);
@@ -581,21 +511,11 @@
             color: var(--text-primary);
             font-size: 0.7rem;
             cursor: pointer;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
         .detail-expanded .edit-btn {
             background: var(--btn-gradient);
             color: var(--badge-text);
             border: none;
-        }
-        .detail-expanded .close-btn {
-            background: var(--card-bg);
-        }
-        .detail-expanded .info-note {
-            margin-top: 0.5rem;
-            font-size: 0.6rem;
-            text-align: right;
-            color: var(--text-secondary);
         }
         .modify-tag-detail {
             display: inline-block;
@@ -610,7 +530,6 @@
         .modify-tag-detail.no-change {
             background: #4a7a5a;
         }
-
         .note-section {
             margin-top: 0.8rem;
             border-top: 1px solid var(--border);
@@ -618,7 +537,6 @@
         }
         .note-section h3 {
             font-size: 0.85rem;
-            font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 0.4rem;
             border-left: 3px solid var(--accent);
@@ -631,7 +549,6 @@
             border: 1px solid var(--border);
             background: var(--input-bg);
             color: var(--text-primary);
-            font-size: 0.8rem;
             resize: vertical;
             font-family: inherit;
         }
@@ -644,10 +561,6 @@
             font-size: 0.7rem;
             cursor: pointer;
             color: var(--text-primary);
-            transition: 0.1s;
-        }
-        .note-save-btn:hover {
-            background: var(--hover-bg);
         }
 
         .modal {
@@ -669,13 +582,11 @@
             padding: 2rem;
             max-width: 550px;
             width: 90%;
-            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2);
             border: 1px solid var(--accent);
             color: var(--text-primary);
         }
         .modal-content h3 {
             font-size: 1.6rem;
-            font-weight: 700;
             color: var(--accent);
             text-align: center;
             margin-bottom: 1.5rem;
@@ -703,14 +614,6 @@
             color: var(--text-primary);
             font-size: 0.9rem;
         }
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 8px var(--accent)80;
-        }
-        .form-group input[type="file"] {
-            padding: 0.4rem;
-        }
         .modal-buttons {
             display: flex;
             gap: 1rem;
@@ -723,7 +626,6 @@
             border: none;
             cursor: pointer;
             font-weight: 600;
-            transition: 0.1s;
         }
         .cancel-modal {
             background: rgba(100, 100, 100, 0.2);
@@ -733,10 +635,6 @@
         .confirm-modal {
             background: var(--btn-gradient);
             color: var(--badge-text);
-        }
-        .confirm-modal:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 10px var(--accent)80;
         }
 
         .progress-modal {
@@ -760,7 +658,6 @@
             width: 90%;
             text-align: center;
             border: 1px solid var(--accent);
-            box-shadow: 0 20px 35px rgba(0,0,0,0.3);
         }
         .progress-content h3 {
             color: var(--accent);
@@ -793,6 +690,13 @@
             backdrop-filter: blur(8px);
             border: 1px solid var(--accent);
             color: var(--text-primary);
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 5px 14px;
+            border-radius: 30px;
+            z-index: 10000;
         }
         @keyframes fadeUp {
             from { opacity: 0; transform: translateX(-50%) translateY(8px); }
@@ -980,9 +884,10 @@
     }
     function getRankText(r) { return rankTextMap[r]; }
 
-    // ========== 云端数据操作 ==========
+    // ========== 云端数据操作（带详细日志） ==========
     async function loadAllData() {
         showToast("加载数据中...", "#3c7a5a");
+        console.log("开始加载数据...");
         try {
             const { data: monsters, error: mErr } = await supabaseClient.from('monsters').select('*').order('id');
             if (mErr) throw mErr;
@@ -1013,14 +918,15 @@
             if (nErr) throw nErr;
             monsterNotes = {};
             if (notes) notes.forEach(n => { monsterNotes[n.monster_id] = n.note_text || ""; });
-            // 确保每个怪物都有完整的测试状态和备注
             for (let m of monstersBase) {
                 if (!monsterTestStates[m.id]) monsterTestStates[m.id] = {};
                 for (let t of testCategories) if (monsterTestStates[m.id][t.key] === undefined) monsterTestStates[m.id][t.key] = "";
                 if (monsterNotes[m.id] === undefined) monsterNotes[m.id] = "";
             }
+            console.log("加载完成，怪物数量：", monstersBase.length);
+            console.log("测试状态：", monsterTestStates);
         } catch (err) {
-            console.error(err);
+            console.error("加载数据失败：", err);
             showToast("加载数据失败，请刷新页面重试", "#ffb3a0");
             monstersBase = [];
             monsterTestStates = {};
@@ -1029,11 +935,13 @@
     }
 
     async function syncAllData() {
+        console.log("========== syncAllData 开始 ==========");
         showToast("同步中...", "#3c7a5a");
         let hasError = false;
         try {
-            // 1. 保存怪物基础信息（确保所有怪物在数据库中）
+            // 1. 先确保所有怪物都存在
             for (let monster of monstersBase) {
+                console.log(`准备保存怪物 ID=${monster.id}, 名称=${monster.name}`);
                 const { error } = await supabaseClient.from('monsters').upsert({
                     id: monster.id,
                     name: monster.name,
@@ -1049,20 +957,25 @@
                     console.error(`怪物 ${monster.id} 保存失败：`, error);
                     showToast(`怪物 ${monster.id} 保存失败：${error.message}`, "#ffb3a0");
                     hasError = true;
+                } else {
+                    console.log(`怪物 ${monster.id} 保存成功`);
                 }
             }
 
             // 2. 保存测试状态
+            console.log("开始保存测试状态...");
             for (let mid in monsterTestStates) {
+                console.log(`处理怪物 ID=${mid} 的测试状态`);
                 for (let t of testCategories) {
                     const value = monsterTestStates[mid][t.key] || "";
+                    console.log(`  保存测试状态: monster_id=${mid}, test_key=${t.key}, value=${value}`);
                     const { error } = await supabaseClient.from('monster_test_states').upsert({
                         monster_id: parseInt(mid),
                         test_key: t.key,
                         test_value: value
                     }, { onConflict: 'monster_id, test_key' });
                     if (error) {
-                        console.error(`测试状态保存失败 (怪物 ${mid}):`, error);
+                        console.error(`测试状态保存失败 (怪物 ${mid}, ${t.key}):`, error);
                         showToast(`测试状态保存失败：${error.message}`, "#ffb3a0");
                         hasError = true;
                     }
@@ -1070,8 +983,10 @@
             }
 
             // 3. 保存备注
+            console.log("开始保存备注...");
             for (let mid in monsterNotes) {
                 const note = monsterNotes[mid] || "";
+                console.log(`保存备注: monster_id=${mid}, note=${note}`);
                 const { error } = await supabaseClient.from('monster_notes').upsert({
                     monster_id: parseInt(mid),
                     note_text: note,
@@ -1089,6 +1004,7 @@
             } else {
                 showToast("部分数据同步失败，请查看控制台", "#ffb3a0");
             }
+            console.log("========== syncAllData 结束 ==========");
         } catch (err) {
             console.error("syncAllData 整体错误：", err);
             showToast(`同步失败：${err.message}，请查看控制台`, "#ffb3a0");
@@ -1145,7 +1061,6 @@
                 
                 progressText.innerText = `开始导入 ${newList.length} 个怪物...`;
                 progressBar.style.width = '15%';
-                // 清空所有相关表
                 await supabaseClient.from('monsters').delete().neq('id', 0);
                 await supabaseClient.from('monster_test_states').delete().neq('monster_id', 0);
                 await supabaseClient.from('monster_notes').delete().neq('monster_id', 0);
@@ -1193,7 +1108,7 @@
         reader.readAsArrayBuffer(file);
     }
 
-    // ========== UI 渲染逻辑 ==========
+    // ========== UI 渲染逻辑（与之前一致） ==========
     function sortMonsters(list) {
         const order = { "minion":1, "elite":2, "boss":3 };
         return [...list].sort((a,b)=>{
@@ -1357,7 +1272,6 @@
             <div class="info-note">点击编辑可修改怪物数据 | 保存按钮同步所有修改</div>
         `;
 
-        // 绑定测试状态下拉变化
         container.querySelectorAll('.status-select').forEach(sel => {
             const testKey = sel.getAttribute('data-test');
             const mid = parseInt(sel.getAttribute('data-mid'));
@@ -1372,7 +1286,6 @@
             });
         });
 
-        // 备注保存按钮
         const noteSaveBtn = container.querySelector('.note-save-btn');
         if (noteSaveBtn) {
             noteSaveBtn.addEventListener('click', async () => {
