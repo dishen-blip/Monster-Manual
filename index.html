@@ -44,7 +44,6 @@
             --border: rgba(44, 110, 74, 0.3);
             --input-bg: #ffffff;
             --shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
-            /* 强化日间模式确认按钮的渐变（深绿） */
             --btn-gradient: linear-gradient(135deg, #2c6e4a, #1e5a3a);
             --badge-bg: #2c6e4a;
             --badge-text: #ffffff;
@@ -398,8 +397,9 @@
             margin-bottom: 0.8rem;
             flex-wrap: wrap;
         }
+        /* 放大详情图片容器，完整显示图片 */
         .detail-expanded .detail-avatar {
-            width: 105px;            /* 原70px → 1.5倍 */
+            width: 105px;
             height: 105px;
             background: radial-gradient(circle at 30% 30%, #3a3a3a, #2a2a2a);
             border-radius: 1rem;
@@ -414,7 +414,7 @@
         .detail-expanded .detail-avatar img {
             width: 100%;
             height: 100%;
-            object-fit: contain;    /* 改为 contain，显示完整图片 */
+            object-fit: contain;
         }
         .detail-expanded .detail-avatar span {
             font-size: 2.2rem;
@@ -622,6 +622,16 @@
             color: var(--text-primary);
             font-size: 0.9rem;
         }
+        .paste-preview {
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+        .paste-preview img {
+            max-width: 100%;
+            max-height: 100px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
         .modal-buttons {
             display: flex;
             gap: 1rem;
@@ -774,7 +784,7 @@
     <div class="monster-grid" id="monsterGrid"></div>
 </div>
 
-<!-- 添加怪物模态框 -->
+<!-- 添加怪物模态框（带粘贴图片功能） -->
 <div id="addModal" class="modal">
     <div class="modal-content">
         <h3>➕ 收录新怪物</h3>
@@ -788,6 +798,14 @@
             <div class="form-group"><label>🛡️ 韧性值</label><input type="number" id="newArmor" value="100"></div>
             <div class="form-group"><label><input type="checkbox" id="newIsChanged"> 🔄 是新增/改动怪物</label></div>
             <div class="form-group"><label>🖼️ 怪物图片</label><input type="file" id="newImage" accept="image/*"></div>
+            <div class="form-group">
+                <label>📋 粘贴图片</label>
+                <div id="pastePreviewAdd" class="paste-preview" style="display: none;">
+                    <img id="pasteImageAdd" alt="粘贴图片预览">
+                    <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">已从剪贴板粘贴</p>
+                </div>
+                <small style="font-size: 0.7rem; color: var(--text-secondary);">💡 支持粘贴图片（Ctrl+V）</small>
+            </div>
             <div class="modal-buttons">
                 <button type="button" id="cancelAddBtn" class="cancel-modal">取消</button>
                 <button type="submit" class="confirm-modal">确认收录</button>
@@ -796,7 +814,7 @@
     </div>
 </div>
 
-<!-- 编辑怪物模态框 -->
+<!-- 编辑怪物模态框（带粘贴图片功能） -->
 <div id="editModal" class="modal">
     <div class="modal-content">
         <h3>✏️ 编辑怪物</h3>
@@ -810,6 +828,14 @@
             <div class="form-group"><label>🛡️ 韧性值</label><input type="number" id="editArmor" value="100"></div>
             <div class="form-group"><label><input type="checkbox" id="editIsChanged"> 🔄 是新增/改动怪物</label></div>
             <div class="form-group"><label>🖼️ 怪物图片</label><input type="file" id="editImage" accept="image/*"></div>
+            <div class="form-group">
+                <label>📋 粘贴图片</label>
+                <div id="pastePreviewEdit" class="paste-preview" style="display: none;">
+                    <img id="pasteImageEdit" alt="粘贴图片预览">
+                    <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">已从剪贴板粘贴</p>
+                </div>
+                <small style="font-size: 0.7rem; color: var(--text-secondary);">💡 支持粘贴图片（Ctrl+V）</small>
+            </div>
             <div class="modal-buttons">
                 <button type="button" id="cancelEditBtn" class="cancel-modal">取消</button>
                 <button type="submit" class="confirm-modal">保存修改</button>
@@ -846,6 +872,10 @@
     let selectedIds = new Set();
     let currentExpandedCard = null;
     let currentExpandedId = null;
+
+    // 粘贴图片临时存储
+    let pastedImageDataAdd = null;
+    let pastedImageDataEdit = null;
 
     const testCategories = [
         { key: "model", label: "模型" }, { key: "collision", label: "碰撞" },
@@ -946,13 +976,12 @@
         }
     }
 
-    // ========== 全量保存（备用，由“保存”按钮触发） ==========
+    // ========== 全量保存（备用） ==========
     async function syncAllData() {
         console.log("全量保存开始...");
         showToast("同步中...", "#3c7a5a");
         let hasError = false;
         try {
-            // 1. 保存怪物
             for (let monster of monstersBase) {
                 const { error } = await supabaseClient.from('monsters').upsert({
                     id: monster.id,
@@ -967,7 +996,6 @@
                 }, { onConflict: 'id' });
                 if (error) throw error;
             }
-            // 2. 保存测试状态
             for (let mid in monsterTestStates) {
                 for (let t of testCategories) {
                     const value = monsterTestStates[mid][t.key] || "";
@@ -979,7 +1007,6 @@
                     if (error) throw error;
                 }
             }
-            // 3. 保存备注
             for (let mid in monsterNotes) {
                 const note = monsterNotes[mid] || "";
                 const { error } = await supabaseClient.from('monster_notes').upsert({
@@ -1010,7 +1037,7 @@
         }
     }
 
-    // ========== 导入表格（修复图片列） ==========
+    // ========== 导入表格 ==========
     function importFromFile(file) {
         const progressModal = document.getElementById('progressModal');
         const progressBar = document.getElementById('importProgressBar');
@@ -1042,7 +1069,6 @@
                     const isChangedRaw = row["是否是新增（改动）怪物，无改动是无"];
                     const isChanged = !(isChangedRaw === "无" || !isChangedRaw);
                     let image = row["怪物图片"];
-                    // 处理图片列：如果图片列是对象（比如嵌入的图片），则转为字符串或留空
                     if (image && typeof image === 'object') {
                         console.warn(`行 ${id} 的怪物图片为对象，无法直接显示。将使用 ID 代替。`);
                         image = "";
@@ -1201,18 +1227,9 @@
         const monster = monstersBase.find(m => m.id === monsterId);
         if (!monster) return;
 
-        // 确保当前怪物的测试状态和备注存在
-        if (!monsterTestStates[monster.id]) {
-            monsterTestStates[monster.id] = {};
-        }
-        for (let t of testCategories) {
-            if (monsterTestStates[monster.id][t.key] === undefined) {
-                monsterTestStates[monster.id][t.key] = "";
-            }
-        }
-        if (monsterNotes[monster.id] === undefined) {
-            monsterNotes[monster.id] = "";
-        }
+        if (!monsterTestStates[monster.id]) monsterTestStates[monster.id] = {};
+        for (let t of testCategories) if (monsterTestStates[monster.id][t.key] === undefined) monsterTestStates[monster.id][t.key] = "";
+        if (monsterNotes[monster.id] === undefined) monsterNotes[monster.id] = "";
 
         const stats = getDynamicStats(monster);
         const modifyCls = monster.isChanged ? 'changed' : 'no-change';
@@ -1266,7 +1283,6 @@
             <div class="info-note">点击编辑可修改怪物数据 | 修改后自动保存</div>
         `;
 
-        // 测试状态下拉即时保存
         container.querySelectorAll('.status-select').forEach(sel => {
             const testKey = sel.getAttribute('data-test');
             const mid = parseInt(sel.getAttribute('data-mid'));
@@ -1280,7 +1296,6 @@
             });
         });
 
-        // 备注保存按钮
         const noteSaveBtn = container.querySelector('.note-save-btn');
         if (noteSaveBtn) {
             noteSaveBtn.addEventListener('click', async () => {
@@ -1309,7 +1324,123 @@
         });
     }
 
-    // ========== 编辑弹窗 ==========
+    // ========== 粘贴功能辅助 ==========
+    function setupPasteHandler(modalId, isAdd) {
+        const modal = document.getElementById(modalId);
+        const pasteHandler = (e) => {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const data = event.target.result;
+                        if (isAdd) {
+                            pastedImageDataAdd = data;
+                            const img = document.getElementById('pasteImageAdd');
+                            if (img) img.src = data;
+                            const previewDiv = document.getElementById('pastePreviewAdd');
+                            if (previewDiv) previewDiv.style.display = 'block';
+                        } else {
+                            pastedImageDataEdit = data;
+                            const img = document.getElementById('pasteImageEdit');
+                            if (img) img.src = data;
+                            const previewDiv = document.getElementById('pastePreviewEdit');
+                            if (previewDiv) previewDiv.style.display = 'block';
+                        }
+                        showToast("图片已粘贴，提交时将使用此图片", "#3c7a5a");
+                    };
+                    reader.readAsDataURL(blob);
+                    break;
+                }
+            }
+        };
+        modal.addEventListener('paste', pasteHandler);
+        modal._pasteHandler = pasteHandler;
+    }
+
+    function removePasteHandler(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal && modal._pasteHandler) {
+            modal.removeEventListener('paste', modal._pasteHandler);
+            delete modal._pasteHandler;
+        }
+    }
+
+    // ========== 添加怪物 ==========
+    async function addMonster(e) {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('newId').value);
+        if (isNaN(id) || monstersBase.some(m => m.id === id)) {
+            showToast("ID无效或重复", "#ffb3a0");
+            return;
+        }
+        const name = document.getElementById('newName').value.trim();
+        if (!name) {
+            showToast("名称不能为空", "#ffb3a0");
+            return;
+        }
+        const rank = parseRank(document.getElementById('newRank').value);
+        let type = document.getElementById('newType').value.trim();
+        if (!type) type = "未知";
+        const hp = parseInt(document.getElementById('newHp').value) || 100;
+        const atk = parseInt(document.getElementById('newAtk').value) || 100;
+        const armorValue = parseFloat(document.getElementById('newArmor').value);
+        const finalArmor = isNaN(armorValue) ? 100 : armorValue;
+        const isChanged = document.getElementById('newIsChanged').checked;
+        const imgFile = document.getElementById('newImage').files[0];
+        const finish = async (imgData) => {
+            const newMonster = {
+                id, name, type, rank, baseHp: hp, baseAtk: atk, baseArmor: finalArmor,
+                isChanged, image: imgData ? "" : id.toString(), imageData: imgData || null
+            };
+            monstersBase.push(newMonster);
+            monsterTestStates[id] = {};
+            for (let t of testCategories) monsterTestStates[id][t.key] = "";
+            monsterNotes[id] = "";
+            try {
+                const { error: insertErr } = await supabaseClient.from('monsters').insert({
+                    id: newMonster.id, name: newMonster.name, type: newMonster.type, rank: newMonster.rank,
+                    base_hp: newMonster.baseHp, base_atk: newMonster.baseAtk, base_armor: newMonster.baseArmor,
+                    is_changed: newMonster.isChanged, image_data: newMonster.imageData
+                });
+                if (insertErr) throw insertErr;
+                for (let t of testCategories) {
+                    await supabaseClient.from('monster_test_states').insert({
+                        monster_id: newMonster.id, test_key: t.key, test_value: ""
+                    });
+                }
+                await supabaseClient.from('monster_notes').insert({
+                    monster_id: newMonster.id, note_text: ""
+                });
+                updateCounts();
+                renderGrid();
+                document.getElementById('addModal').style.display = 'none';
+                document.getElementById('addForm').reset();
+                // 清除粘贴预览
+                document.getElementById('pastePreviewAdd').style.display = 'none';
+                pastedImageDataAdd = null;
+                showToast(`✨ 添加 ${name} 成功`, "#9bc48f");
+            } catch (err) {
+                console.error("添加怪物失败：", err);
+                showToast(`添加失败：${err.message}`, "#ffb3a0");
+                monstersBase.pop();
+                delete monsterTestStates[id];
+                delete monsterNotes[id];
+            }
+        };
+        if (pastedImageDataAdd) {
+            finish(pastedImageDataAdd);
+        } else if (imgFile) {
+            const reader = new FileReader();
+            reader.onload = e => finish(e.target.result);
+            reader.readAsDataURL(imgFile);
+        } else {
+            finish(null);
+        }
+    }
+
+    // ========== 编辑怪物（含粘贴图片） ==========
     let currentEditMonsterId = null;
     function openEditModal(monsterId) {
         const monster = monstersBase.find(m => m.id === monsterId);
@@ -1324,9 +1455,19 @@
         document.getElementById('editArmor').value = monster.baseArmor;
         document.getElementById('editIsChanged').checked = monster.isChanged;
         document.getElementById('editImage').value = '';
+        // 清除上次粘贴数据
+        pastedImageDataEdit = null;
+        document.getElementById('pastePreviewEdit').style.display = 'none';
+        document.getElementById('pasteImageEdit').src = '';
         document.getElementById('editModal').style.display = 'flex';
+        setupPasteHandler('editModal', false);
     }
-    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; currentEditMonsterId = null; }
+    function closeEditModal() {
+        const modal = document.getElementById('editModal');
+        removePasteHandler('editModal');
+        modal.style.display = 'none';
+        currentEditMonsterId = null;
+    }
     async function saveEditMonster(e) {
         e.preventDefault();
         const id = parseInt(document.getElementById('editId').value);
@@ -1354,17 +1495,10 @@
                 monster.imageData = imgData;
                 monster.image = "";
             }
-            // 保存该怪物
             const { error } = await supabaseClient.from('monsters').upsert({
-                id: monster.id,
-                name: monster.name,
-                type: monster.type,
-                rank: monster.rank,
-                base_hp: monster.baseHp,
-                base_atk: monster.baseAtk,
-                base_armor: monster.baseArmor,
-                is_changed: monster.isChanged,
-                image_data: monster.imageData
+                id: monster.id, name: monster.name, type: monster.type, rank: monster.rank,
+                base_hp: monster.baseHp, base_atk: monster.baseAtk, base_armor: monster.baseArmor,
+                is_changed: monster.isChanged, image_data: monster.imageData
             }, { onConflict: 'id' });
             if (error) throw error;
             renderGrid();
@@ -1378,106 +1512,14 @@
             closeEditModal();
             showToast("✨ 怪物数据已更新", "#3c7a5a");
         };
-        if (imgFile) {
+        if (pastedImageDataEdit) {
+            finishUpdate(pastedImageDataEdit);
+        } else if (imgFile) {
             const r = new FileReader();
             r.onload = e => finishUpdate(e.target.result);
             r.readAsDataURL(imgFile);
         } else {
             finishUpdate(null);
-        }
-    }
-
-    // ========== 添加怪物（修复 parseArmor 错误） ==========
-    async function addMonster(e) {
-        e.preventDefault();
-        const id = parseInt(document.getElementById('newId').value);
-        if (isNaN(id) || monstersBase.some(m => m.id === id)) {
-            showToast("ID无效或重复", "#ffb3a0");
-            return;
-        }
-        const name = document.getElementById('newName').value.trim();
-        if (!name) {
-            showToast("名称不能为空", "#ffb3a0");
-            return;
-        }
-        const rank = parseRank(document.getElementById('newRank').value);
-        let type = document.getElementById('newType').value.trim();
-        if (!type) type = "未知";
-        const hp = parseInt(document.getElementById('newHp').value) || 100;
-        const atk = parseInt(document.getElementById('newAtk').value) || 100;
-        // 直接解析韧性值，不使用 parseArmor
-        const armorValue = parseFloat(document.getElementById('newArmor').value);
-        const finalArmor = isNaN(armorValue) ? 100 : armorValue;
-        const isChanged = document.getElementById('newIsChanged').checked;
-        const imgFile = document.getElementById('newImage').files[0];
-        const finish = async (imgData) => {
-            const newMonster = {
-                id,
-                name,
-                type,
-                rank,
-                baseHp: hp,
-                baseAtk: atk,
-                baseArmor: finalArmor,
-                isChanged,
-                image: imgData ? "" : id.toString(),
-                imageData: imgData || null
-            };
-            monstersBase.push(newMonster);
-            // 初始化测试状态和备注
-            monsterTestStates[id] = {};
-            for (let t of testCategories) monsterTestStates[id][t.key] = "";
-            monsterNotes[id] = "";
-            // 保存到云端
-            try {
-                // 先插入怪物
-                const { error: insertErr } = await supabaseClient.from('monsters').insert({
-                    id: newMonster.id,
-                    name: newMonster.name,
-                    type: newMonster.type,
-                    rank: newMonster.rank,
-                    base_hp: newMonster.baseHp,
-                    base_atk: newMonster.baseAtk,
-                    base_armor: newMonster.baseArmor,
-                    is_changed: newMonster.isChanged,
-                    image_data: newMonster.imageData
-                });
-                if (insertErr) throw insertErr;
-                // 插入测试状态（初始为空）
-                for (let t of testCategories) {
-                    await supabaseClient.from('monster_test_states').insert({
-                        monster_id: newMonster.id,
-                        test_key: t.key,
-                        test_value: ""
-                    });
-                }
-                // 插入备注（初始为空）
-                await supabaseClient.from('monster_notes').insert({
-                    monster_id: newMonster.id,
-                    note_text: ""
-                });
-                // 更新计数和网格
-                updateCounts();
-                renderGrid();
-                // 关闭模态框并清空表单
-                document.getElementById('addModal').style.display = 'none';
-                document.getElementById('addForm').reset();
-                showToast(`✨ 添加 ${name} 成功`, "#9bc48f");
-            } catch (err) {
-                console.error("添加怪物失败：", err);
-                showToast(`添加失败：${err.message}`, "#ffb3a0");
-                // 回滚本地数据
-                monstersBase.pop();
-                delete monsterTestStates[id];
-                delete monsterNotes[id];
-            }
-        };
-        if (imgFile) {
-            const r = new FileReader();
-            r.onload = e => finish(e.target.result);
-            r.readAsDataURL(imgFile);
-        } else {
-            finish(null);
         }
     }
 
@@ -1577,8 +1619,17 @@
             e.target.value=''; 
         });
         
-        document.getElementById('addMonsterBtn').addEventListener('click', () => document.getElementById('addModal').style.display = 'flex');
-        document.getElementById('cancelAddBtn').addEventListener('click', () => document.getElementById('addModal').style.display = 'none');
+        document.getElementById('addMonsterBtn').addEventListener('click', () => {
+            pastedImageDataAdd = null;
+            document.getElementById('pastePreviewAdd').style.display = 'none';
+            document.getElementById('pasteImageAdd').src = '';
+            document.getElementById('addModal').style.display = 'flex';
+            setupPasteHandler('addModal', true);
+        });
+        document.getElementById('cancelAddBtn').addEventListener('click', () => {
+            removePasteHandler('addModal');
+            document.getElementById('addModal').style.display = 'none';
+        });
         document.getElementById('addForm').addEventListener('submit', addMonster);
         document.getElementById('deleteSelectedBtn').addEventListener('click', deleteSelected);
         document.getElementById('manualSaveBtn').addEventListener('click', syncAllData);
