@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* 所有样式与之前一致，仅修改 .confirm-modal 样式以增强对比度 */
+        /* ========== 样式 ========== */
         * {
             margin: 0;
             padding: 0;
@@ -44,7 +44,8 @@
             --border: rgba(44, 110, 74, 0.3);
             --input-bg: #ffffff;
             --shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
-            --btn-gradient: linear-gradient(135deg, #e8f0e2, #d4e0ca);
+            /* 强化日间模式确认按钮的渐变（深绿） */
+            --btn-gradient: linear-gradient(135deg, #2c6e4a, #1e5a3a);
             --badge-bg: #2c6e4a;
             --badge-text: #ffffff;
             --card-bg: #ffffff;
@@ -632,22 +633,18 @@
             color: var(--text-primary);
             border: 1px solid var(--border);
         }
-        /* 强化确认按钮样式，使其在任何主题下都醒目 */
         .confirm-modal {
-            background: linear-gradient(135deg, #4a8c4a, #2c6e2c);
-            color: white;
-            border: 1px solid #4a8c4a;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+            background: var(--btn-gradient);
+            color: var(--badge-text);
+            border: 1px solid var(--accent);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            font-weight: bold;
+            transition: 0.1s;
         }
         .confirm-modal:hover {
             transform: translateY(-2px);
             filter: brightness(1.05);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-        [data-theme="light"] .confirm-modal {
-            background: linear-gradient(135deg, #2c6e4a, #1e5a3a);
-            border-color: #1e5a3a;
+            box-shadow: 0 4px 12px var(--accent)60;
         }
 
         .progress-modal {
@@ -883,12 +880,6 @@
         return null;
     }
 
-    // 定义 parseArmor 函数（修复错误）
-    function parseArmor(value) {
-        let num = parseFloat(value);
-        return isNaN(num) ? 100 : num;
-    }
-
     function getDynamicStats(monster) {
         let hp = monster.baseHp, atk = monster.baseAtk, armor = monster.baseArmor;
         const rank = monster.rank;
@@ -1012,7 +1003,7 @@
         }
     }
 
-    // ========== 导入表格 ==========
+    // ========== 导入表格（修复图片列） ==========
     function importFromFile(file) {
         const progressModal = document.getElementById('progressModal');
         const progressBar = document.getElementById('importProgressBar');
@@ -1043,7 +1034,14 @@
                     const armor = getNumericValue(row, ["韧性值", "韧性", "ARMOR", "armor"]) ?? 100;
                     const isChangedRaw = row["是否是新增（改动）怪物，无改动是无"];
                     const isChanged = !(isChangedRaw === "无" || !isChangedRaw);
-                    const image = row["怪物图片"] || "";
+                    let image = row["怪物图片"];
+                    // 处理图片列：如果图片列是对象（比如嵌入的图片），则转为字符串或留空
+                    if (image && typeof image === 'object') {
+                        console.warn(`行 ${id} 的怪物图片为对象，无法直接显示。将使用 ID 代替。`);
+                        image = "";
+                    } else {
+                        image = image || "";
+                    }
                     newList.push({ id, name, type, rank, baseHp: hp, baseAtk: atk, baseArmor: armor, isChanged, image, imageData: null });
                 }
                 if (!newList.length) throw new Error("无有效数据");
@@ -1382,7 +1380,7 @@
         }
     }
 
-    // ========== 添加怪物（修复版） ==========
+    // ========== 添加怪物（修复 parseArmor 错误） ==========
     async function addMonster(e) {
         e.preventDefault();
         const id = parseInt(document.getElementById('newId').value);
@@ -1400,7 +1398,9 @@
         if (!type) type = "未知";
         const hp = parseInt(document.getElementById('newHp').value) || 100;
         const atk = parseInt(document.getElementById('newAtk').value) || 100;
-        const armor = parseArmor(document.getElementById('newArmor').value);
+        // 直接解析韧性值，不使用 parseArmor
+        const armorValue = parseFloat(document.getElementById('newArmor').value);
+        const finalArmor = isNaN(armorValue) ? 100 : armorValue;
         const isChanged = document.getElementById('newIsChanged').checked;
         const imgFile = document.getElementById('newImage').files[0];
         const finish = async (imgData) => {
@@ -1411,7 +1411,7 @@
                 rank,
                 baseHp: hp,
                 baseAtk: atk,
-                baseArmor: armor,
+                baseArmor: finalArmor,
                 isChanged,
                 image: imgData ? "" : id.toString(),
                 imageData: imgData || null
@@ -1456,8 +1456,6 @@
                 document.getElementById('addModal').style.display = 'none';
                 document.getElementById('addForm').reset();
                 showToast(`✨ 添加 ${name} 成功`, "#9bc48f");
-                // 可选：自动打开新怪物的详情（提升体验）
-                // 刷新网格后，新怪物已在列表中，点击即可查看
             } catch (err) {
                 console.error("添加怪物失败：", err);
                 showToast(`添加失败：${err.message}`, "#ffb3a0");
